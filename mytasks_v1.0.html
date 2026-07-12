@@ -543,6 +543,7 @@ function normFilterArr(v, allIds){ if(Array.isArray(v)) return v; if(v) return [
 function normStatusFilter(v){ return normFilterArr(v, STATUSES.map(s=>s.id)); }
 function normPriorityFilter(v){ return normFilterArr(v, PRIORITIES.map(p=>p.id)); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function abbreviateName(name, maxLen=20){ return name.length > maxLen ? name.slice(0, maxLen) + '…' : name; }
 function projById(id){ return projects.find(p=>p.id===id); }
 function colorOf(name){ return CAT_COLORS.find(c=>c.name===name) || CAT_COLORS[0]; }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
@@ -623,7 +624,7 @@ function renderSidebar(){
     return `<div class="project-row ${filterProjectId===p.id?'active':''}" data-id="${p.id}" onclick="setProjectFilter('${p.id}')"
       ${p.locked ? '' : `draggable="true" ondragstart="handleProjectDragStart(event,'${p.id}')" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,'${p.id}')" ondragleave="handleProjectDragLeave(event)" ondrop="handleProjectDrop(event,'${p.id}')"`}>
       <span class="dot" style="background:${c.dot}"></span>
-      <span class="pname">${esc(p.name)}</span>
+      <span class="pname" title="${esc(p.name)}">${esc(abbreviateName(p.name))}</span>
       <span class="count">${taskCountsForProject(p.id)}</span>
       <span class="project-actions">
         <button class="icon-btn" onclick="event.stopPropagation();openProjectModal('${p.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
@@ -697,7 +698,7 @@ function renderList(){
           ? `<input type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
           : `<span class="task-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${esc(t.title)}</span>`}
       </div>
-      <div class="task-cell"><span class="badge-project"><span class="dot" style="background:${c.dot}"></span>${esc(proj?proj.name:'')}</span></div>
+      <div class="task-cell"><span class="badge-project"${proj?` title="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span></div>
       <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${t.priority}</span></div>
       <div class="task-cell status"><span class="badge badge-status-${t.status}">${statusLabel(t.status)}</span></div>
       <div class="task-cell due">${dueCell}</div>
