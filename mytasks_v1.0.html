@@ -112,6 +112,9 @@
   .project-row:hover { background: var(--bg-2); }
   .project-row:hover .project-actions { opacity: 1; }
   .project-row.active { background: var(--bg-2); font-weight: 600; }
+  .project-row.dragging { opacity: 0.4; }
+  .project-row.drag-over-top { box-shadow: inset 0 2px 0 0 var(--blue-text); }
+  .project-row.drag-over-bottom { box-shadow: inset 0 -2px 0 0 var(--blue-text); }
   .project-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .project-row .pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .project-row .count { font-size: 11px; color: var(--text-3); }
@@ -563,7 +566,8 @@ function renderSidebar(){
 
   document.getElementById('projectList').innerHTML = projects.map(p=>{
     const c = colorOf(p.color);
-    return `<div class="project-row ${filterProjectId===p.id?'active':''}" onclick="setProjectFilter('${p.id}')">
+    return `<div class="project-row ${filterProjectId===p.id?'active':''}" data-id="${p.id}" onclick="setProjectFilter('${p.id}')"
+      ${p.locked ? '' : `draggable="true" ondragstart="handleProjectDragStart(event,'${p.id}')" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,'${p.id}')" ondragleave="handleProjectDragLeave(event)" ondrop="handleProjectDrop(event,'${p.id}')"`}>
       <span class="dot" style="background:${c.dot}"></span>
       <span class="pname">${esc(p.name)}</span>
       <span class="count">${taskCountsForProject(p.id)}</span>
@@ -862,6 +866,50 @@ function deleteProject(id){
       });
     }
   });
+}
+
+// ── Project reordering ───────────────────────────────────────────────────────
+let draggedProjectId = null;
+function handleProjectDragStart(e, id){
+  draggedProjectId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+  e.currentTarget.classList.add('dragging');
+}
+function handleProjectDragEnd(e){
+  draggedProjectId = null;
+  document.querySelectorAll('.project-row.dragging').forEach(el=>el.classList.remove('dragging'));
+  document.querySelectorAll('.project-row.drag-over-top,.project-row.drag-over-bottom').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom'));
+}
+function handleProjectDragOver(e, targetId){
+  if(!draggedProjectId || draggedProjectId===targetId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const row = e.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const zone = (e.clientY - rect.top) / rect.height < 0.5 ? 'top' : 'bottom';
+  row.classList.remove('drag-over-top','drag-over-bottom');
+  row.classList.add(zone==='top' ? 'drag-over-top' : 'drag-over-bottom');
+}
+function handleProjectDragLeave(e){
+  e.currentTarget.classList.remove('drag-over-top','drag-over-bottom');
+}
+function handleProjectDrop(e, targetId){
+  if(!draggedProjectId || draggedProjectId===targetId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const row = e.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const zone = (e.clientY - rect.top) / rect.height < 0.5 ? 'top' : 'bottom';
+  row.classList.remove('drag-over-top','drag-over-bottom');
+  const srcIdx = projects.findIndex(p=>p.id===draggedProjectId);
+  if(srcIdx===-1) return;
+  const [src] = projects.splice(srcIdx,1);
+  let targetIdx = projects.findIndex(p=>p.id===targetId);
+  if(targetIdx===-1){ projects.push(src); }
+  else{ projects.splice(zone==='top' ? targetIdx : targetIdx+1, 0, src); }
+  draggedProjectId = null;
+  save(); render();
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
