@@ -116,7 +116,7 @@
   .project-row.drag-over-top { box-shadow: inset 0 2px 0 0 var(--blue-text); }
   .project-row.drag-over-bottom { box-shadow: inset 0 -2px 0 0 var(--blue-text); }
   .project-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .project-row .pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-row .pname { flex: 1; min-width: 0; white-space: nowrap; }
   .project-row .count { font-size: 11px; color: var(--text-3); }
   .project-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .1s; width: 46px; flex-shrink: 0; justify-content: flex-end; }
 
@@ -188,7 +188,7 @@
   .badge-due { background: var(--bg-3); color: var(--text-2); }
   .badge-due.overdue { background: var(--red-bg); color: var(--red-text); }
   .badge-due.today { background: var(--amber-bg); color: var(--amber-text); }
-  .badge-project { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge-project { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); white-space: nowrap; }
   .badge-project .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
   .row-actions { grid-area: del; display: flex; justify-content: flex-end; gap: 2px; opacity: 0; transition: opacity .1s; margin-top: 1px; margin-left: -12px; }
 
@@ -254,6 +254,17 @@
   .toast.show { transform: translateY(0); opacity: 1; }
   .toast.error { background: var(--red-text); }
   .toast-undo { background: none; border: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; margin-left: 2px; }
+
+  [data-tooltip] { position: relative; }
+  [data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute; left: 0; top: 100%; margin-top: 5px;
+    background: var(--text); color: var(--bg); font-size: 11px; font-weight: 500;
+    padding: 4px 8px; border-radius: 5px; white-space: nowrap;
+    opacity: 0; pointer-events: none; z-index: 50;
+    transition: opacity 0.08s ease-out; transition-delay: 0.12s;
+  }
+  [data-tooltip]:hover::after { opacity: 1; }
 
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 5px; }
@@ -624,7 +635,7 @@ function renderSidebar(){
     return `<div class="project-row ${filterProjectId===p.id?'active':''}" data-id="${p.id}" onclick="setProjectFilter('${p.id}')"
       ${p.locked ? '' : `draggable="true" ondragstart="handleProjectDragStart(event,'${p.id}')" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,'${p.id}')" ondragleave="handleProjectDragLeave(event)" ondrop="handleProjectDrop(event,'${p.id}')"`}>
       <span class="dot" style="background:${c.dot}"></span>
-      <span class="pname" title="${esc(p.name)}">${esc(abbreviateName(p.name))}</span>
+      <span class="pname"${p.name.length>20?` data-tooltip="${esc(p.name)}"`:''}>${esc(abbreviateName(p.name))}</span>
       <span class="count">${taskCountsForProject(p.id)}</span>
       <span class="project-actions">
         <button class="icon-btn" onclick="event.stopPropagation();openProjectModal('${p.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
@@ -698,7 +709,7 @@ function renderList(){
           ? `<input type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
           : `<span class="task-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${esc(t.title)}</span>`}
       </div>
-      <div class="task-cell"><span class="badge-project"${proj?` title="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span></div>
+      <div class="task-cell"><span class="badge-project"${proj&&proj.name.length>20?` data-tooltip="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span></div>
       <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${t.priority}</span></div>
       <div class="task-cell status"><span class="badge badge-status-${t.status}">${statusLabel(t.status)}</span></div>
       <div class="task-cell due">${dueCell}</div>
@@ -838,7 +849,7 @@ function renderDrawer(){
 
   overlay.classList.add('open'); drawer.classList.add('open');
 
-  const projOptions = projects.map(p=>`<option value="${p.id}" ${p.id===t.projectId?'selected':''}>${esc(p.name)}</option>`).join('');
+  const projOptions = projects.map(p=>`<option value="${p.id}" ${p.id===t.projectId?'selected':''}${p.name.length>20?` title="${esc(p.name)}"`:''}>${esc(abbreviateName(p.name))}</option>`).join('');
   const statusOptions = STATUSES.map(s=>`<option value="${s.id}" ${s.id===t.status?'selected':''}>${esc(s.label)}</option>`).join('');
   const priorityOptions = PRIORITIES.map(p=>`<option value="${p.id}" ${p.id===t.priority?'selected':''}>${esc(p.label)}</option>`).join('');
   const repeatOptions = REPEATS.map(r=>`<option value="${r.id}" ${r.id===(t.repeat||'none')?'selected':''}>${esc(r.label)}</option>`).join('');
@@ -1280,15 +1291,6 @@ document.addEventListener('keydown', e=>{
       triggerToastUndo();
     }
     return;
-  }
-  if(e.key==='Enter' && activeTaskId){
-    const el = document.activeElement;
-    const skip = el && (el.tagName==='TEXTAREA' || el.id==='newSubtaskInput' || el.id==='renameSubtaskInputDrawer');
-    if(!skip){
-      e.preventDefault();
-      closeDrawer();
-      return;
-    }
   }
   if(e.key==='/' && !isTypingTarget(document.activeElement) && !document.querySelector('.modal-bg.open')){
     e.preventDefault();
