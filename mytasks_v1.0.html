@@ -144,7 +144,7 @@
   .task-row.kbd-selected .row-actions { opacity: 1; }
   .task-row.done .task-title { text-decoration: line-through; color: var(--text-3); }
 
-  .task-checkbox { grid-area: check; width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: all .15s; align-self: start; }
+  .task-checkbox { grid-area: check; width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: all .15s; }
   .task-checkbox:hover { border-color: var(--green-text); }
   .task-checkbox.checked { background: var(--green-text); border-color: var(--green-text); }
   .task-checkbox i { font-size: 10px; color: #fff; opacity: 0; transition: opacity .1s; }
@@ -374,7 +374,7 @@
 <div class="modal-bg" id="importModalBg" onclick="if(event.target===this) closeAllModals()">
   <div class="modal">
     <h3>Import library</h3>
-    <p>Merge the imported file into your current tasks and projects, or replace everything with the file's contents?</p>
+    <p>Merge the imported file into your current tasks and projects, or replace everything with the file's contents? Replacing automatically downloads a backup of your current library first.</p>
     <div class="modal-actions">
       <button class="btn" onclick="closeAllModals()">Cancel</button>
       <button class="btn" onclick="applyImport('merge')">Merge</button>
@@ -1227,12 +1227,15 @@ function triggerToastUndo(){
 }
 
 // ── Export / Import ───────────────────────────────────────────────────────────
-function exportLibrary(){
-  const blob = new Blob([JSON.stringify({version:1, exported:new Date().toISOString(), projects, tasks}, null, 2)], {type:'application/json'});
+function downloadBackup(proj, tsk, filename){
+  const blob = new Blob([JSON.stringify({version:1, exported:new Date().toISOString(), projects:proj, tasks:tsk}, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `mytasks-${new Date().toISOString().slice(0,10)}.json`;
+  a.href = url; a.download = filename;
   a.click(); URL.revokeObjectURL(url);
+}
+function exportLibrary(){
+  downloadBackup(projects, tasks, `mytasks-${new Date().toISOString().slice(0,10)}.json`);
 }
 function triggerImport(){ document.getElementById('fileInput').click(); }
 function handleFileImport(event){
@@ -1264,9 +1267,10 @@ function mergeData(data){
 function applyImport(mode){
   if(!pendingImportData) return;
   if(mode==='replace'){
+    downloadBackup(projects, tasks, `mytasks-backup-before-replace-${new Date().toISOString().slice(0,10)}.json`);
     projects = pendingImportData.projects || defaultProjects();
     tasks = pendingImportData.tasks || [];
-    showToast('Library replaced');
+    showToast('Backed up previous library, then replaced');
   } else {
     const {added, updated} = mergeData(pendingImportData);
     showToast(`Merged — ${added} added, ${updated} updated`);
@@ -1293,19 +1297,40 @@ const _fsGet = ()  => _fsIdb('readonly',  (s,r,j)=>{ const q=s.get(_FS.key);    
 const _fsPut = h   => _fsIdb('readwrite', (s,r,j)=>{ const q=s.put(h,_FS.key);   q.onsuccess=()=>r();         q.onerror=()=>j(q.error); });
 const _fsDel = ()  => _fsIdb('readwrite', (s,r,j)=>{ const q=s.delete(_FS.key);  q.onsuccess=()=>r();         q.onerror=()=>j(q.error); });
 
+let lastSyncedSnapshot = null;
 async function fileSyncWrite(data){
   if(!fileHandle) return;
   try{
     const perm = await fileHandle.requestPermission({mode:'readwrite'});
     if(perm!=='granted'){ await _clearFileLink(); return; }
+    let payload = data;
+    if(lastSyncedSnapshot!==null){
+      let currentText = '';
+      try{ currentText = await (await fileHandle.getFile()).text(); }catch(_){}
+      if(currentText.trim() && currentText!==lastSyncedSnapshot){
+        let externalData; try{ externalData = JSON.parse(currentText); }catch(_){ externalData=null; }
+        if(externalData && externalData.tasks && externalData.projects){
+          const {added, updated} = mergeData(externalData);
+          if(added || updated){
+            payload = { ...data, projects, tasks };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+            render();
+            showToast(`Synced changes from another tab/device (${added} added, ${updated} updated)`);
+          }
+        }
+      }
+    }
     const w = await fileHandle.createWritable();
-    await w.write(JSON.stringify(data, null, 2));
+    const text = JSON.stringify(payload, null, 2);
+    await w.write(text);
     await w.close();
+    lastSyncedSnapshot = text;
     updateFileSyncUI();
   }catch(e){ /* localStorage remains the authoritative fallback */ }
 }
 async function _clearFileLink(){
   fileHandle = null;
+  lastSyncedSnapshot = null;
   await _fsDel().catch(()=>{});
   updateFileSyncUI();
 }
@@ -1386,7 +1411,8 @@ async function reconnectFile(){
   try{
     const perm = await fileHandle.requestPermission({mode:'readwrite'});
     if(perm!=='granted'){ showToast('Permission denied', true); return; }
-    const data = JSON.parse(await (await fileHandle.getFile()).text());
+    const text = await (await fileHandle.getFile()).text();
+    const data = JSON.parse(text);
     if(data.tasks && data.projects){
       projects = data.projects; tasks = data.tasks;
       if(data.filterProjectId!==undefined) filterProjectId = data.filterProjectId;
@@ -1395,6 +1421,7 @@ async function reconnectFile(){
       if(data.myDayFilter!==undefined) myDayFilter = data.myDayFilter;
       if(data.thisWeekFilter!==undefined) thisWeekFilter = data.thisWeekFilter;
       if(data.overdueFilter!==undefined) overdueFilter = data.overdueFilter;
+      lastSyncedSnapshot = text;
       render();
     }
     updateFileSyncUI();
@@ -1430,9 +1457,11 @@ async function initFileSync(){
     const perm = await handle.queryPermission({mode:'readwrite'});
     if(perm==='granted'){
       try{
-        const data = JSON.parse(await (await handle.getFile()).text());
+        const text = await (await handle.getFile()).text();
+        const data = JSON.parse(text);
         if(data.tasks && data.projects){
           projects = data.projects; tasks = data.tasks;
+          lastSyncedSnapshot = text;
           render();
         }
       }catch(_){ /* read failed — keep localStorage data */ }
