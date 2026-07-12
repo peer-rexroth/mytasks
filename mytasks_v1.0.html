@@ -1313,7 +1313,12 @@ document.addEventListener('click', e=>{
   if(!e.target.closest('#linkSplitBtn')) closeLinkMenu();
 });
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renamingTaskId=null; renamingSubtask=null; selectedTaskIds.clear(); renderList(); renderBulkBar(); return; }
+  if(e.key==='Escape'){
+    closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renamingTaskId=null; renamingSubtask=null; selectedTaskIds.clear(); renderList(); renderBulkBar();
+    const el = document.activeElement;
+    if(el && (el.id==='quickAddInput' || el.id==='searchInput')) el.blur();
+    return;
+  }
   if((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase()==='z' && !isTypingTarget(document.activeElement) && !document.querySelector('.modal-bg.open')){
     if(toastUndoAction){
       e.preventDefault();
