@@ -433,6 +433,13 @@ const PRIORITIES = [
   {id:'medium', label:'Medium', bg:'var(--amber-bg)', text:'var(--amber-text)'},
   {id:'low',    label:'Low',    bg:'var(--teal-bg)',  text:'var(--teal-text)'}
 ];
+const REPEATS = [
+  {id:'none',    label:"Doesn't repeat"},
+  {id:'daily',   label:'Daily'},
+  {id:'weekly',  label:'Weekly'},
+  {id:'monthly', label:'Monthly'},
+  {id:'yearly',  label:'Yearly'}
+];
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let projects = [], tasks = [];
@@ -491,6 +498,7 @@ function load(){
       if(!t.subtasks) t.subtasks=[];
       if(!t.priority) t.priority='medium';
       if(!t.status) t.status='todo';
+      if(!t.repeat) t.repeat='none';
       if(t.dueDate===undefined) t.dueDate=null;
       if(!t.notes) t.notes='';
       if(!t.createdAt) t.createdAt=Date.now();
@@ -524,6 +532,25 @@ function fmtDate(iso){
   return new Date(y,m-1,d).toLocaleDateString(undefined,{month:'short',day:'numeric'});
 }
 function statusLabel(id){ return (STATUSES.find(s=>s.id===id)||{}).label || id; }
+function repeatLabel(id){ return (REPEATS.find(r=>r.id===id)||{}).label || id; }
+function isoFromParts(y,m,d){ return `${String(y).padStart(4,'0')}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+function nextOccurrence(dateStr, type){
+  const base = dateStr || todayStr();
+  const [y,m,day] = base.split('-').map(Number);
+  if(type==='daily'){ const d=new Date(y,m-1,day+1); return isoFromParts(d.getFullYear(),d.getMonth()+1,d.getDate()); }
+  if(type==='weekly'){ const d=new Date(y,m-1,day+7); return isoFromParts(d.getFullYear(),d.getMonth()+1,d.getDate()); }
+  if(type==='monthly'){
+    let ny=y, nm=m+1; if(nm>12){ nm=1; ny=y+1; }
+    const lastDay = new Date(ny,nm,0).getDate();
+    return isoFromParts(ny, nm, Math.min(day,lastDay));
+  }
+  if(type==='yearly'){
+    const ny = y+1;
+    const lastDay = new Date(ny,m,0).getDate();
+    return isoFromParts(ny, m, Math.min(day,lastDay));
+  }
+  return base;
+}
 function isOverdue(t){ return !!t.dueDate && t.dueDate < todayStr() && t.status!=='done'; }
 function isThisWeek(dueDate){
   if(!dueDate) return false;
@@ -639,6 +666,9 @@ function renderList(){
       const isToday = t.dueDate === todayStr();
       dueCell = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${overdue?'Overdue · ':''}${fmtDate(t.dueDate)}</span>`;
     }
+    if(t.repeat && t.repeat!=='none'){
+      dueCell += `<i class="fa-solid fa-repeat" style="color:var(--text-3);font-size:11px;margin-left:5px" title="Repeats ${repeatLabel(t.repeat)}"></i>`;
+    }
     return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''}" data-id="${t.id}" onclick="openTask('${t.id}')">
       <div class="task-checkbox ${t.status==='done'?'checked':''}" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <div class="task-main">
@@ -683,6 +713,7 @@ function renderDrawer(){
   const projOptions = projects.map(p=>`<option value="${p.id}" ${p.id===t.projectId?'selected':''}>${esc(p.name)}</option>`).join('');
   const statusOptions = STATUSES.map(s=>`<option value="${s.id}" ${s.id===t.status?'selected':''}>${esc(s.label)}</option>`).join('');
   const priorityOptions = PRIORITIES.map(p=>`<option value="${p.id}" ${p.id===t.priority?'selected':''}>${esc(p.label)}</option>`).join('');
+  const repeatOptions = REPEATS.map(r=>`<option value="${r.id}" ${r.id===(t.repeat||'none')?'selected':''}>${esc(r.label)}</option>`).join('');
 
   const subDone = (t.subtasks||[]).filter(s=>s.done).length;
   const subTotal = (t.subtasks||[]).length;
@@ -716,6 +747,12 @@ function renderDrawer(){
         <div class="field">
           <label>Due date</label>
           <input type="date" value="${t.dueDate||''}" onchange="updateTaskField('${t.id}','dueDate',this.value||null)">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Repeat</label>
+          <select onchange="updateTaskField('${t.id}','repeat',this.value)">${repeatOptions}</select>
         </div>
       </div>
       <div class="field">
@@ -766,6 +803,14 @@ function quickAddTask(event){
 
 function toggleTaskDone(id){
   const t = tasks.find(x=>x.id===id); if(!t) return;
+  if(t.status!=='done' && t.repeat && t.repeat!=='none'){
+    t.dueDate = nextOccurrence(t.dueDate, t.repeat);
+    (t.subtasks||[]).forEach(s=>{ s.done=false; });
+    t.updatedAt = Date.now();
+    save(); render();
+    showToast(`Recurring task rescheduled to ${fmtDate(t.dueDate)}`);
+    return;
+  }
   t.status = t.status==='done' ? 'todo' : 'done';
   t.updatedAt = Date.now();
   save(); render();
@@ -773,6 +818,10 @@ function toggleTaskDone(id){
 
 function updateTaskField(id, field, value){
   const t = tasks.find(x=>x.id===id); if(!t) return;
+  if(field==='status' && value==='done' && t.status!=='done' && t.repeat && t.repeat!=='none'){
+    toggleTaskDone(id);
+    return;
+  }
   t[field] = value;
   t.updatedAt = Date.now();
   save(); render();
@@ -815,6 +864,7 @@ function duplicateTask(id){
     status: 'todo',
     priority: t.priority,
     dueDate: null,
+    repeat: t.repeat || 'none',
     subtasks: (t.subtasks||[]).map(s=>({id:genId(), text:s.text, done:false})),
     createdAt: Date.now(), updatedAt: Date.now()
   };
