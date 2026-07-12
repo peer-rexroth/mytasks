@@ -248,6 +248,10 @@
   .help-row { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text-2); line-height: 1.5; margin-bottom: 12px; }
   .help-row i { width: 16px; margin-top: 2px; color: var(--text-3); }
   .help-tip { font-size: 12px; color: var(--text-3); background: var(--bg-2); border-radius: var(--radius); padding: 10px 12px; line-height: 1.6; }
+  .shortcuts-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+  .shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text-2); }
+  .kbd-group { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
+  kbd { font-family: var(--mono); font-size: 11px; color: var(--text); background: var(--bg-2); border: 0.5px solid var(--border-2); border-radius: 4px; padding: 2px 6px; box-shadow: 0 1px 0 var(--border-2); }
 
   /* toast */
   .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; transform: translateY(80px); opacity: 0; transition: all 0.25s ease; z-index: 300; }
@@ -292,6 +296,7 @@
       </div>
     </div>
     <button class="btn btn-icon btn-sm" onclick="toggleCompactMode()" title="Toggle compact view"><i class="fa-solid fa-expand" id="compactIcon"></i></button>
+    <button class="btn btn-icon btn-sm" onclick="openShortcutsModal()" title="Keyboard shortcuts"><i class="fa-solid fa-keyboard"></i></button>
     <button class="btn btn-icon btn-sm" onclick="toggleTheme()" title="Toggle theme"><i class="fa-solid fa-circle-half-stroke" id="themeIcon"></i></button>
     <button class="btn btn-icon btn-sm" onclick="openHelpModal()" title="Help"><i class="fa-solid fa-circle-question"></i></button>
   </div>
@@ -411,6 +416,27 @@
       <div class="help-row"><i class="fa-solid fa-download"></i><span><strong style="color:var(--text)">Export</strong> downloads a one-off backup. <strong style="color:var(--text)">Import</strong> loads a backup back in, merging or replacing your current library.</span></div>
     </div>
     <div class="help-tip">Nothing here ever leaves your machine — there's no server, no account, and no admin rights required to run this app.</div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="closeAllModals()">Got it</button></div>
+  </div>
+</div>
+
+<!-- Shortcuts modal -->
+<div class="modal-bg" id="shortcutsModalBg" onclick="if(event.target===this) closeAllModals()">
+  <div class="modal" style="width:440px">
+    <h3>Keyboard shortcuts</h3>
+    <div class="shortcuts-list">
+      <div class="shortcut-row"><span>Navigate tasks</span><span class="kbd-group"><kbd>&uarr;</kbd><kbd>&darr;</kbd></span></div>
+      <div class="shortcut-row"><span>Open selected task</span><span class="kbd-group"><kbd>Enter</kbd> / <kbd>Space</kbd></span></div>
+      <div class="shortcut-row"><span>Add subtask to selected task</span><span class="kbd-group"><kbd>Tab</kbd></span></div>
+      <div class="shortcut-row"><span>Delete selected task</span><span class="kbd-group"><kbd>Delete</kbd></span></div>
+      <div class="shortcut-row"><span>Undo last delete or edit</span><span class="kbd-group"><kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd></span></div>
+      <div class="shortcut-row"><span>Focus search</span><span class="kbd-group"><kbd>/</kbd></span></div>
+      <div class="shortcut-row"><span>Focus quick-add</span><span class="kbd-group"><kbd>N</kbd></span></div>
+      <div class="shortcut-row"><span>Close drawer/modal, clear selection</span><span class="kbd-group"><kbd>Esc</kbd></span></div>
+      <div class="shortcut-row"><span>Open a task</span><span class="kbd-group">Double-click</span></div>
+      <div class="shortcut-row"><span>Rename title or subtask</span><span class="kbd-group">Double-click text</span></div>
+      <div class="shortcut-row"><span>Multi-select tasks</span><span class="kbd-group"><kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+Click, <kbd>Shift</kbd>+Click</span></div>
+    </div>
     <div class="modal-actions"><button class="btn btn-primary" onclick="closeAllModals()">Got it</button></div>
   </div>
 </div>
@@ -1260,6 +1286,7 @@ function confirmModalAction(){
   closeAllModals();
 }
 function openHelpModal(){ document.getElementById('helpModalBg').classList.add('open'); }
+function openShortcutsModal(){ document.getElementById('shortcutsModalBg').classList.add('open'); }
 function showLinkPromptModal(mode, fileName){
   const bg = document.getElementById('linkPromptModalBg'); if(!bg) return;
   const actions = document.getElementById('linkPromptActions');
@@ -1322,7 +1349,7 @@ function addInlineSubtask(taskId){
   document.getElementById('inlineSubtaskInput')?.focus();
 }
 function handleListKeyNav(e){
-  if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter' && e.key!=='Tab' && e.key!=='Delete') return;
+  if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter' && e.key!==' ' && e.key!=='Tab' && e.key!=='Delete') return;
   if(isTypingTarget(document.activeElement)) return;
   if(document.querySelector('.modal-bg.open')) return;
   if(activeTaskId) return;
@@ -1343,7 +1370,7 @@ function handleListKeyNav(e){
     document.getElementById('inlineSubtaskInput')?.focus();
     return;
   }
-  if(e.key==='Enter'){
+  if(e.key==='Enter' || e.key===' '){
     if(kbdSelectedTaskId && list.some(t=>t.id===kbdSelectedTaskId)){
       e.preventDefault();
       openTask(kbdSelectedTaskId);
