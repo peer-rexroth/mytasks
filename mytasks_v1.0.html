@@ -137,6 +137,8 @@
   .task-row { display: grid; grid-template-areas: "check title project priority status due del" ". sub sub sub sub sub ."; column-gap: 10px; row-gap: 6px; align-items: center; padding: 10px 10px; border-radius: var(--radius); border: 0.5px solid transparent; cursor: pointer; }
   .task-row:hover { background: var(--bg); border-color: var(--border); }
   .task-row:hover .row-delete { opacity: 1; }
+  .task-row.kbd-selected { background: var(--bg); border-color: var(--blue-border); box-shadow: 0 0 0 1px var(--blue-border); }
+  .task-row.kbd-selected .row-delete { opacity: 1; }
   .task-row.done .task-title { text-decoration: line-through; color: var(--text-3); }
 
   .task-checkbox { grid-area: check; width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: all .15s; align-self: start; }
@@ -414,6 +416,7 @@ const PRIORITIES = [
 // ── State ─────────────────────────────────────────────────────────────────────
 let projects = [], tasks = [];
 let activeTaskId = null;
+let kbdSelectedTaskId = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = null;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
@@ -590,7 +593,7 @@ function renderList(){
       const isToday = t.dueDate === todayStr();
       dueCell = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${overdue?'Overdue · ':''}${fmtDate(t.dueDate)}</span>`;
     }
-    return `<div class="task-row ${t.status==='done'?'done':''}" onclick="openTask('${t.id}')">
+    return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''}" data-id="${t.id}" onclick="openTask('${t.id}')">
       <div class="task-checkbox ${t.status==='done'?'checked':''}" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <div class="task-main">
         <span class="task-title">${esc(t.title)}</span>
@@ -855,8 +858,38 @@ document.addEventListener('click', e=>{
   if(!e.target.closest('#linkSplitBtn')) closeLinkMenu();
 });
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ closeAllModals(); closeDrawer(); }
+  if(e.key==='Escape'){ closeAllModals(); closeDrawer(); return; }
+  handleListKeyNav(e);
 });
+function isTypingTarget(el){
+  if(!el) return false;
+  const tag = el.tagName;
+  return tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || el.isContentEditable;
+}
+function handleListKeyNav(e){
+  if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter') return;
+  if(isTypingTarget(document.activeElement)) return;
+  if(document.querySelector('.modal-bg.open')) return;
+  if(activeTaskId) return;
+  const list = getFilteredSortedTasks();
+  if(!list.length) return;
+  if(e.key==='Enter'){
+    if(kbdSelectedTaskId && list.some(t=>t.id===kbdSelectedTaskId)){
+      e.preventDefault();
+      openTask(kbdSelectedTaskId);
+    }
+    return;
+  }
+  e.preventDefault();
+  const idx = list.findIndex(t=>t.id===kbdSelectedTaskId);
+  let next;
+  if(idx===-1) next = 0;
+  else if(e.key==='ArrowDown') next = Math.min(idx+1, list.length-1);
+  else next = Math.max(idx-1, 0);
+  kbdSelectedTaskId = list[next].id;
+  renderList();
+  document.querySelector(`.task-row[data-id="${kbdSelectedTaskId}"]`)?.scrollIntoView({block:'nearest'});
+}
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 function toggleTheme(){
