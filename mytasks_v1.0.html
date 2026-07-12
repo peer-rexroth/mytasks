@@ -1687,6 +1687,7 @@ async function reconnectFile(){
 }
 function fadeSwapHTML(el, html){
   if(!el) return;
+  if(el.innerHTML === html) return;
   el.style.transition = 'opacity .12s ease';
   el.style.opacity = '0';
   setTimeout(()=>{
