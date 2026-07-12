@@ -274,7 +274,7 @@
         </div>
       </div>
     </div>
-    <button class="btn btn-icon btn-sm" onclick="toggleCompactMode()" title="Toggle compact view"><i class="fa-solid fa-compress" id="compactIcon"></i></button>
+    <button class="btn btn-icon btn-sm" onclick="toggleCompactMode()" title="Toggle compact view"><i class="fa-solid fa-expand" id="compactIcon"></i></button>
     <button class="btn btn-icon btn-sm" onclick="toggleTheme()" title="Toggle theme"><i class="fa-solid fa-circle-half-stroke" id="themeIcon"></i></button>
     <button class="btn btn-icon btn-sm" onclick="openHelpModal()" title="Help"><i class="fa-solid fa-circle-question"></i></button>
   </div>
@@ -455,12 +455,12 @@ let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
-let compactMode = false;
+let compactMode = true;
 let modalTarget = null, pendingImportData = null;
 let editingProjectId = null, newProjColor = 'blue';
 
 (function(){ const t=localStorage.getItem(THEME_KEY); if(t){currentTheme=t;document.documentElement.setAttribute('data-theme',t);} })();
-(function(){ const c=localStorage.getItem(COMPACT_KEY); if(c==='1'){compactMode=true;document.documentElement.setAttribute('data-density','compact');} })();
+(function(){ const c=localStorage.getItem(COMPACT_KEY); if(c!==null){compactMode = c==='1';} document.documentElement.setAttribute('data-density', compactMode?'compact':''); })();
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 function defaultProjects(){
