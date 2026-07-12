@@ -107,7 +107,6 @@
   .f-chip { font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 20px; cursor: pointer; border: 0.5px solid transparent; background: var(--bg-2); color: var(--text-2); display: inline-flex; align-items: center; gap: 4px; transition: all 0.1s; user-select: none; }
   .f-chip:hover { border-color: var(--border-2); color: var(--text); }
   .f-chip.active { font-weight: 600; border-color: var(--border-2); background: var(--bg-3); color: var(--text); }
-  .f-chip .chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
   .project-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius); cursor: pointer; font-size: 13px; }
   .project-row:hover { background: var(--bg-2); }
@@ -410,9 +409,9 @@ const STATUSES = [
   {id:'done',  label:'Completed',   bg:'var(--green-bg)', text:'var(--green-text)'}
 ];
 const PRIORITIES = [
-  {id:'high',   label:'High'},
-  {id:'medium', label:'Medium'},
-  {id:'low',    label:'Low'}
+  {id:'high',   label:'High',   bg:'var(--red-bg)',   text:'var(--red-text)'},
+  {id:'medium', label:'Medium', bg:'var(--amber-bg)', text:'var(--amber-text)'},
+  {id:'low',    label:'Low',    bg:'var(--teal-bg)',  text:'var(--teal-text)'}
 ];
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -420,7 +419,7 @@ let projects = [], tasks = [];
 let activeTaskId = null;
 let kbdSelectedTaskId = null;
 let inlineAddSubtaskTaskId = null;
-let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = null;
+let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id);
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
 let modalTarget = null, pendingImportData = null;
@@ -461,7 +460,7 @@ function load(){
       tasks = d.tasks || defaultTasks();
       filterProjectId = d.filterProjectId ?? null;
       filterStatus = normStatusFilter(d.filterStatus);
-      filterPriority = d.filterPriority ?? null;
+      filterPriority = normPriorityFilter(d.filterPriority);
       sortBy = d.sortBy || 'smart';
       if(d.theme){ currentTheme=d.theme; document.documentElement.setAttribute('data-theme',d.theme); localStorage.setItem(THEME_KEY,d.theme); }
     } else {
@@ -492,7 +491,9 @@ function save(){
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
-function normStatusFilter(v){ if(Array.isArray(v)) return v; if(v) return [v]; return STATUSES.map(s=>s.id); }
+function normFilterArr(v, allIds){ if(Array.isArray(v)) return v; if(v) return [v]; return allIds; }
+function normStatusFilter(v){ return normFilterArr(v, STATUSES.map(s=>s.id)); }
+function normPriorityFilter(v){ return normFilterArr(v, PRIORITIES.map(p=>p.id)); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function projById(id){ return projects.find(p=>p.id===id); }
 function colorOf(name){ return CAT_COLORS.find(c=>c.name===name) || CAT_COLORS[0]; }
@@ -526,11 +527,12 @@ function renderSidebar(){
     return `<div class="f-chip ${active?'active':''}" style="${active?`background:${s.bg};color:${s.text};border-color:${s.text}`:''}" onclick="setStatusFilter('${s.id}')">${esc(s.label)}</div>`;
   }).join('');
 
-  document.getElementById('priorityChips').innerHTML = PRIORITIES.map(p=>`
-    <div class="f-chip ${filterPriority===p.id?'active':''}" onclick="setPriorityFilter('${p.id}')">
-      <span class="chip-dot" style="background:${p.id==='high'?'var(--red-text)':p.id==='medium'?'var(--amber-text)':'var(--teal-text)'}"></span>${esc(p.label)}
-    </div>
-  `).join('');
+  document.getElementById('priorityChips').innerHTML = `
+    <div class="f-chip ${filterPriority.length===PRIORITIES.length?'active':''}" onclick="setPriorityFilter(null)">All</div>
+  ` + PRIORITIES.map(p=>{
+    const active = filterPriority.includes(p.id);
+    return `<div class="f-chip ${active?'active':''}" style="${active?`background:${p.bg};color:${p.text};border-color:${p.text}`:''}" onclick="setPriorityFilter('${p.id}')">${esc(p.label)}</div>`;
+  }).join('');
 
   document.getElementById('projectList').innerHTML = projects.map(p=>{
     const c = colorOf(p.color);
@@ -564,7 +566,7 @@ function getFilteredSortedTasks(){
   let list = tasks.filter(t=>{
     if(filterProjectId && t.projectId!==filterProjectId) return false;
     if(!filterStatus.includes(t.status)) return false;
-    if(filterPriority && t.priority!==filterPriority) return false;
+    if(!filterPriority.includes(t.priority)) return false;
     if(searchQuery){
       const q = searchQuery.toLowerCase();
       const hay = (t.title+' '+(t.notes||'')).toLowerCase();
@@ -818,7 +820,14 @@ function setStatusFilter(s){
   filterStatus = filterStatus.includes(s) ? filterStatus.filter(x=>x!==s) : [...filterStatus, s];
   save(); render();
 }
-function setPriorityFilter(p){ filterPriority = (filterPriority===p) ? null : p; save(); render(); }
+function setPriorityFilter(p){
+  if(p===null){
+    filterPriority = filterPriority.length===PRIORITIES.length ? [] : PRIORITIES.map(x=>x.id);
+    save(); render(); return;
+  }
+  filterPriority = filterPriority.includes(p) ? filterPriority.filter(x=>x!==p) : [...filterPriority, p];
+  save(); render();
+}
 function setSortBy(v){ sortBy = v; save(); renderList(); }
 function setSearchQuery(v){ searchQuery = v; renderList(); }
 
@@ -1099,7 +1108,7 @@ async function reconnectFile(){
       projects = data.projects; tasks = data.tasks;
       if(data.filterProjectId!==undefined) filterProjectId = data.filterProjectId;
       if(data.filterStatus!==undefined) filterStatus = normStatusFilter(data.filterStatus);
-      if(data.filterPriority!==undefined) filterPriority = data.filterPriority;
+      if(data.filterPriority!==undefined) filterPriority = normPriorityFilter(data.filterPriority);
       render();
     }
     updateFileSyncUI();
@@ -1140,7 +1149,7 @@ async function initFileSync(){
           projects = data.projects; tasks = data.tasks;
           if(data.filterProjectId!==undefined) filterProjectId = data.filterProjectId;
           if(data.filterStatus!==undefined) filterStatus = normStatusFilter(data.filterStatus);
-          if(data.filterPriority!==undefined) filterPriority = data.filterPriority;
+          if(data.filterPriority!==undefined) filterPriority = normPriorityFilter(data.filterPriority);
           render();
         }
       }catch(_){ /* read failed — keep localStorage data */ }
