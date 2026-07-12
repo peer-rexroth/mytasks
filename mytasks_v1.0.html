@@ -137,6 +137,7 @@
   .task-list-header { display: grid; column-gap: 10px; padding: 0 10px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); border-bottom: 0.5px solid var(--border); margin-bottom: 4px; position: sticky; top: 0; background: var(--bg-2); z-index: 5; }
 
   .task-row { display: grid; grid-template-areas: "check title project priority status due del" ". sub sub sub sub sub ."; column-gap: 10px; row-gap: 6px; align-items: center; padding: 10px 10px; border-radius: var(--radius); border: 0.5px solid transparent; cursor: pointer; }
+  html[data-density="compact"] .task-row { padding: 3px 10px; row-gap: 2px; }
   .task-row:hover { background: var(--bg); border-color: var(--border); }
   .task-row:hover .row-actions { opacity: 1; }
   .task-row.kbd-selected { background: var(--bg); border-color: var(--blue-border); box-shadow: 0 0 0 1px var(--blue-border); }
@@ -273,6 +274,7 @@
         </div>
       </div>
     </div>
+    <button class="btn btn-icon btn-sm" onclick="toggleCompactMode()" title="Toggle compact view"><i class="fa-solid fa-compress" id="compactIcon"></i></button>
     <button class="btn btn-icon btn-sm" onclick="toggleTheme()" title="Toggle theme"><i class="fa-solid fa-circle-half-stroke" id="themeIcon"></i></button>
     <button class="btn btn-icon btn-sm" onclick="openHelpModal()" title="Help"><i class="fa-solid fa-circle-question"></i></button>
   </div>
@@ -413,6 +415,7 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'mytasks_data_v1';
 const THEME_KEY = 'mytasks_theme';
+const COMPACT_KEY = 'mytasks_compact';
 const CAT_COLORS = [
   {name:'blue',   dot:'var(--blue-text)',   bg:'var(--blue-bg)',   text:'var(--blue-text)'},
   {name:'teal',   dot:'var(--teal-text)',   bg:'var(--teal-bg)',   text:'var(--teal-text)'},
@@ -452,10 +455,12 @@ let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
+let compactMode = false;
 let modalTarget = null, pendingImportData = null;
 let editingProjectId = null, newProjColor = 'blue';
 
 (function(){ const t=localStorage.getItem(THEME_KEY); if(t){currentTheme=t;document.documentElement.setAttribute('data-theme',t);} })();
+(function(){ const c=localStorage.getItem(COMPACT_KEY); if(c==='1'){compactMode=true;document.documentElement.setAttribute('data-density','compact');} })();
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 function defaultProjects(){
@@ -490,6 +495,7 @@ function load(){
       tasks = d.tasks || defaultTasks();
       sortBy = d.sortBy || 'smart';
       if(d.theme){ currentTheme=d.theme; document.documentElement.setAttribute('data-theme',d.theme); localStorage.setItem(THEME_KEY,d.theme); }
+      if(d.compactMode!==undefined){ compactMode=d.compactMode; document.documentElement.setAttribute('data-density', compactMode?'compact':''); localStorage.setItem(COMPACT_KEY, compactMode?'1':'0'); }
     } else {
       projects = defaultProjects();
       tasks = defaultTasks();
@@ -512,7 +518,7 @@ function load(){
   }
 }
 function save(){
-  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme };
+  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, compactMode };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(fileHandle) fileSyncWrite(data).catch(()=>{});
 }
@@ -1188,6 +1194,17 @@ function toggleTheme(){
   localStorage.setItem(THEME_KEY, currentTheme);
   save();
 }
+function toggleCompactMode(){
+  compactMode = !compactMode;
+  document.documentElement.setAttribute('data-density', compactMode ? 'compact' : '');
+  localStorage.setItem(COMPACT_KEY, compactMode ? '1' : '0');
+  updateCompactIcon();
+  save();
+}
+function updateCompactIcon(){
+  const icon = document.getElementById('compactIcon');
+  if(icon) icon.className = compactMode ? 'fa-solid fa-expand' : 'fa-solid fa-compress';
+}
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 let toastUndoAction = null, toastHideTimer = null;
@@ -1324,7 +1341,7 @@ async function createNewLinkedFile(){
     });
     fileHandle = handle;
     try{ await _fsPut(handle); }catch(_){}
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme});
+    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, compactMode});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not create file', true); }
@@ -1355,7 +1372,7 @@ async function linkFile(){
       }
       return;
     }
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme});
+    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, compactMode});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not link file', true); }
@@ -1433,6 +1450,7 @@ async function initFileSync(){
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 load();
+updateCompactIcon();
 render();
 initFileSync();
 </script>
