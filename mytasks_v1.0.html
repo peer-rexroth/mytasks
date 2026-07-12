@@ -130,22 +130,29 @@
   .quickadd input { flex: 1; border: none; padding: 9px 10px; font-size: 14px; background: transparent; color: var(--text); outline: none; font-family: var(--font); }
 
   .task-list { flex: 1; overflow-y: auto; padding: 0 14px 20px; }
-  .task-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 10px; border-radius: var(--radius); border: 0.5px solid transparent; cursor: pointer; }
+  .task-list-header, .task-row { grid-template-columns: 28px minmax(0,1fr) 150px 100px 130px 28px; }
+  .task-list-header { display: grid; column-gap: 10px; padding: 0 10px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); border-bottom: 0.5px solid var(--border); margin-bottom: 4px; position: sticky; top: 0; background: var(--bg-2); z-index: 5; }
+
+  .task-row { display: grid; grid-template-areas: "check title project priority due del" ". sub sub sub sub ."; column-gap: 10px; row-gap: 6px; align-items: center; padding: 10px 10px; border-radius: var(--radius); border: 0.5px solid transparent; cursor: pointer; }
   .task-row:hover { background: var(--bg); border-color: var(--border); }
   .task-row:hover .row-delete { opacity: 1; }
   .task-row.done .task-title { text-decoration: line-through; color: var(--text-3); }
 
-  .task-checkbox { width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-2); flex-shrink: 0; margin-top: 2px; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: all .15s; }
+  .task-checkbox { grid-area: check; width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: all .15s; align-self: start; }
   .task-checkbox:hover { border-color: var(--green-text); }
   .task-checkbox.checked { background: var(--green-text); border-color: var(--green-text); }
   .task-checkbox i { font-size: 10px; color: #fff; opacity: 0; transition: opacity .1s; }
   .task-checkbox.checked i { opacity: 1; }
 
-  .task-main { flex: 1; min-width: 0; }
+  .task-main { grid-area: title; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .task-title { font-size: 14px; font-weight: 500; word-break: break-word; }
-  .task-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
 
-  .task-subtasks { margin-top: 7px; padding-left: 10px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+  .task-cell { grid-area: project; min-width: 0; }
+  .task-cell.priority { grid-area: priority; }
+  .task-cell.due { grid-area: due; }
+  .task-cell-empty { color: var(--text-3); font-size: 12px; }
+
+  .task-subtasks { grid-area: sub; padding-left: 10px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
   .task-subtask-row { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); }
   .task-subtask-row .mini-check { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg-2); transition: all .15s; }
   .task-subtask-row .mini-check:hover { border-color: var(--green-text); }
@@ -160,9 +167,8 @@
   .badge-due { background: var(--bg-3); color: var(--text-2); }
   .badge-due.overdue { background: var(--red-bg); color: var(--red-text); }
   .badge-due.today { background: var(--amber-bg); color: var(--amber-text); }
-  .badge-project { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-2); }
+  .badge-project { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge-project .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-  .badge-sub { font-size: 11px; color: var(--text-3); display: inline-flex; align-items: center; gap: 3px; }
   .row-delete { opacity: 0; transition: opacity .1s; margin-top: 1px; }
 
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-3); }
@@ -299,7 +305,10 @@
       <i class="fa-solid fa-plus"></i>
       <input type="text" id="quickAddInput" placeholder="Add a task and press Enter…" onkeydown="quickAddTask(event)">
     </div>
-    <div class="task-list" id="taskList"></div>
+    <div class="task-list">
+      <div class="task-list-header"><span></span><span>Task</span><span>Project</span><span>Priority</span><span>Due</span><span></span></div>
+      <div id="taskList"></div>
+    </div>
   </div>
 </div>
 
@@ -554,29 +563,27 @@ function renderList(){
     const proj = projById(t.projectId);
     const c = proj ? colorOf(proj.color) : colorOf('blue');
     const subTotal = (t.subtasks||[]).length;
-    let dueBadge = '';
+    let dueCell = '<span class="task-cell-empty">—</span>';
     if(t.dueDate){
       const overdue = t.dueDate < todayStr() && t.status!=='done';
       const isToday = t.dueDate === todayStr();
-      dueBadge = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${overdue?'Overdue · ':''}${fmtDate(t.dueDate)}</span>`;
+      dueCell = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${overdue?'Overdue · ':''}${fmtDate(t.dueDate)}</span>`;
     }
     return `<div class="task-row ${t.status==='done'?'done':''}" onclick="openTask('${t.id}')">
       <div class="task-checkbox ${t.status==='done'?'checked':''}" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <div class="task-main">
-        <div class="task-title">${esc(t.title)}</div>
-        <div class="task-meta">
-          <span class="badge-project"><span class="dot" style="background:${c.dot}"></span>${esc(proj?proj.name:'')}</span>
-          <span class="badge badge-priority-${t.priority}">${t.priority}</span>
-          ${t.status==='doing'?'<span class="badge" style="background:var(--blue-bg);color:var(--blue-text)">In Progress</span>':''}
-          ${dueBadge}
-        </div>
-        ${subTotal>0?`<div class="task-subtasks">${t.subtasks.map(s=>`
-          <div class="task-subtask-row ${s.done?'done':''}">
-            <div class="mini-check ${s.done?'checked':''}" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
-            <span>${esc(s.text)}</span>
-          </div>
-        `).join('')}</div>`:''}
+        <span class="task-title">${esc(t.title)}</span>
+        ${t.status==='doing'?'<span class="badge" style="background:var(--blue-bg);color:var(--blue-text)">In Progress</span>':''}
       </div>
+      <div class="task-cell"><span class="badge-project"><span class="dot" style="background:${c.dot}"></span>${esc(proj?proj.name:'')}</span></div>
+      <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${t.priority}</span></div>
+      <div class="task-cell due">${dueCell}</div>
+      ${subTotal>0?`<div class="task-subtasks">${t.subtasks.map(s=>`
+        <div class="task-subtask-row ${s.done?'done':''}">
+          <div class="mini-check ${s.done?'checked':''}" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
+          <span>${esc(s.text)}</span>
+        </div>
+      `).join('')}</div>`:''}
       <button class="icon-btn row-delete" onclick="event.stopPropagation();deleteTask('${t.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
     </div>`;
   }).join('');
