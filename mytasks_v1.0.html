@@ -136,7 +136,7 @@
   .task-list-header, .task-row { grid-template-columns: 28px minmax(0,1fr) 150px 100px 120px 130px 52px; }
   .task-list-header { display: grid; column-gap: 10px; padding: 0 10px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); border-bottom: 0.5px solid var(--border); margin-bottom: 4px; position: sticky; top: 0; background: var(--bg-2); z-index: 5; }
 
-  .task-row { display: grid; grid-template-areas: "check title project priority status due del" ". sub sub sub sub sub ."; column-gap: 10px; row-gap: 6px; align-items: center; padding: 10px 10px; border-radius: var(--radius); border: 0.5px solid transparent; cursor: pointer; }
+  .task-row { display: grid; grid-template-areas: "check title project priority status due del" ". sub sub sub sub sub ."; column-gap: 10px; row-gap: 6px; align-items: center; padding: 10px 10px; margin-bottom: 2px; border-radius: var(--radius); border: 0.5px solid transparent; cursor: pointer; }
   html[data-density="compact"] .task-row { padding: 3px 10px; row-gap: 2px; }
   .task-row:hover { background: var(--bg); border-color: var(--border); }
   .task-row:hover .row-actions { opacity: 1; }
