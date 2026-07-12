@@ -621,7 +621,7 @@ function renderList(){
 }
 
 // ── Drawer ────────────────────────────────────────────────────────────────────
-function openTask(id){ activeTaskId = id; renderDrawer(); }
+function openTask(id){ activeTaskId = id; kbdSelectedTaskId = id; inlineAddSubtaskTaskId = null; renderDrawer(); renderList(); }
 function closeDrawer(){ activeTaskId = null; renderDrawer(); }
 
 function renderDrawer(){
