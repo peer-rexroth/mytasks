@@ -765,7 +765,7 @@ function renderList(){
             : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','list')">${highlightMatch(s.text, searchQuery)}</span>`}
         </div>
       `).join('')}${inlineAddSubtaskTaskId===t.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
-        <input type="text" id="inlineSubtaskInput" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')}">
+        <input type="text" id="inlineSubtaskInput" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault();}">
       </div>`:''}</div>`:''}
       <div class="row-actions">
         ${t.repeat && t.repeat!=='none' ? `<button class="icon-btn" onclick="event.stopPropagation();skipOccurrence('${t.id}')" title="Skip to next occurrence"><i class="fa-solid fa-forward-step"></i></button>` : ''}
