@@ -343,7 +343,7 @@
 </div>
 
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
-<div class="drawer" id="drawer"></div>
+<div class="drawer" id="drawer" onkeydown="handleDrawerKeydown(event)"></div>
 
 <!-- Confirm modal -->
 <div class="modal-bg" id="confirmModalBg" onclick="if(event.target===this) closeAllModals()">
@@ -707,6 +707,14 @@ function renderList(){
 // ── Drawer ────────────────────────────────────────────────────────────────────
 function openTask(id){ activeTaskId = id; kbdSelectedTaskId = id; inlineAddSubtaskTaskId = null; renderDrawer(); renderList(); }
 function closeDrawer(){ activeTaskId = null; renderDrawer(); }
+function handleDrawerKeydown(e){
+  if(e.key!=='Enter') return;
+  if(e.target.tagName==='TEXTAREA') return;
+  if(e.target.id==='newSubtaskInput' || e.target.id==='renameSubtaskInputDrawer') return;
+  e.preventDefault();
+  e.stopPropagation();
+  closeDrawer();
+}
 
 function renderDrawer(){
   const overlay = document.getElementById('drawerOverlay');
