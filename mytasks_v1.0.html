@@ -138,9 +138,9 @@
 
   .task-row { display: grid; grid-template-areas: "check title project priority status due del" ". sub sub sub sub sub ."; column-gap: 10px; row-gap: 6px; align-items: center; padding: 10px 10px; border-radius: var(--radius); border: 0.5px solid transparent; cursor: pointer; }
   .task-row:hover { background: var(--bg); border-color: var(--border); }
-  .task-row:hover .row-delete { opacity: 1; }
+  .task-row:hover .row-actions { opacity: 1; }
   .task-row.kbd-selected { background: var(--bg); border-color: var(--blue-border); box-shadow: 0 0 0 1px var(--blue-border); }
-  .task-row.kbd-selected .row-delete { opacity: 1; }
+  .task-row.kbd-selected .row-actions { opacity: 1; }
   .task-row.done .task-title { text-decoration: line-through; color: var(--text-3); }
 
   .task-checkbox { grid-area: check; width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: all .15s; align-self: start; }
@@ -151,6 +151,7 @@
 
   .task-main { grid-area: title; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .task-title { font-size: 14px; font-weight: 500; word-break: break-word; }
+  .task-title-input { font-size: 14px; font-weight: 500; font-family: var(--font); border: 0.5px solid var(--border-2); border-radius: 4px; padding: 2px 5px; background: var(--bg); color: var(--text); outline: none; width: 100%; min-width: 120px; }
 
   .task-cell { grid-area: project; min-width: 0; }
   .task-cell.priority { grid-area: priority; }
@@ -180,7 +181,7 @@
   .badge-due.today { background: var(--amber-bg); color: var(--amber-text); }
   .badge-project { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge-project .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-  .row-delete { opacity: 0; transition: opacity .1s; margin-top: 1px; }
+  .row-actions { grid-area: del; display: flex; gap: 2px; opacity: 0; transition: opacity .1s; margin-top: 1px; }
 
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-3); }
   .empty-state i { font-size: 30px; margin-bottom: 10px; display: block; opacity: .5; }
@@ -290,13 +291,13 @@
         <span><i class="fa-solid fa-calendar-week" style="width:14px;color:var(--text-3);margin-right:6px"></i>This Week</span>
         <span class="count" id="thisWeekCount"></span>
       </div>
-      <div class="nav-item" id="overdueNav" onclick="setOverdueFilter()">
-        <span><i class="fa-solid fa-triangle-exclamation" style="width:14px;color:var(--red-text);margin-right:6px"></i>Overdue</span>
-        <span class="count" id="overdueCount"></span>
-      </div>
       <div class="nav-item" id="allTasksNav" onclick="setProjectFilter(null)">
         <span><i class="fa-solid fa-inbox" style="width:14px;color:var(--text-3);margin-right:6px"></i>All Tasks</span>
         <span class="count" id="allTasksCount"></span>
+      </div>
+      <div class="nav-item" id="overdueNav" onclick="setOverdueFilter()">
+        <span><i class="fa-solid fa-triangle-exclamation" style="width:14px;color:var(--red-text);margin-right:6px"></i>Overdue</span>
+        <span class="count" id="overdueCount"></span>
       </div>
     </div>
     <div class="sidebar-section">
@@ -434,6 +435,7 @@ const PRIORITIES = [
 let projects = [], tasks = [];
 let activeTaskId = null;
 let kbdSelectedTaskId = null;
+let renamingTaskId = null;
 let inlineAddSubtaskTaskId = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id);
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
@@ -636,7 +638,9 @@ function renderList(){
     return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''}" data-id="${t.id}" onclick="openTask('${t.id}')">
       <div class="task-checkbox ${t.status==='done'?'checked':''}" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <div class="task-main">
-        <span class="task-title">${esc(t.title)}</span>
+        ${renamingTaskId===t.id
+          ? `<input type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
+          : `<span class="task-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${esc(t.title)}</span>`}
       </div>
       <div class="task-cell"><span class="badge-project"><span class="dot" style="background:${c.dot}"></span>${esc(proj?proj.name:'')}</span></div>
       <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${t.priority}</span></div>
@@ -650,7 +654,10 @@ function renderList(){
       `).join('')}${inlineAddSubtaskTaskId===t.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
         <input type="text" id="inlineSubtaskInput" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')}">
       </div>`:''}</div>`:''}
-      <button class="icon-btn row-delete" onclick="event.stopPropagation();deleteTask('${t.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+      <div class="row-actions">
+        <button class="icon-btn" onclick="event.stopPropagation();duplicateTask('${t.id}')" title="Duplicate"><i class="fa-regular fa-copy"></i></button>
+        <button class="icon-btn" onclick="event.stopPropagation();deleteTask('${t.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -722,7 +729,10 @@ function renderDrawer(){
     </div>
     <div class="drawer-footer">
       <span class="meta">Updated ${new Date(t.updatedAt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span>
-      <button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="duplicateTask('${t.id}')"><i class="fa-regular fa-copy"></i> Duplicate</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+      </div>
     </div>
   `;
 }
@@ -785,6 +795,46 @@ function deleteTask(id){
       });
     }
   });
+}
+
+function duplicateTask(id){
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  const copy = {
+    id: genId(),
+    title: t.title,
+    notes: t.notes || '',
+    projectId: t.projectId,
+    status: 'todo',
+    priority: t.priority,
+    dueDate: null,
+    subtasks: (t.subtasks||[]).map(s=>({id:genId(), text:s.text, done:false})),
+    createdAt: Date.now(), updatedAt: Date.now()
+  };
+  const idx = tasks.findIndex(x=>x.id===id);
+  tasks.splice(idx+1, 0, copy);
+  kbdSelectedTaskId = copy.id;
+  save(); render();
+  startRenameTask(copy.id);
+  showToast('Task duplicated');
+}
+
+function startRenameTask(id){
+  renamingTaskId = id;
+  renderList();
+  const input = document.getElementById('renameTaskInput');
+  if(input){ input.focus(); input.select(); }
+}
+function commitRenameTask(id, value){
+  if(renamingTaskId!==id) return;
+  renamingTaskId = null;
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  const title = value.trim();
+  if(title && title!==t.title){ t.title = title; t.updatedAt = Date.now(); save(); }
+  render();
+}
+function cancelRenameTask(){
+  renamingTaskId = null;
+  renderList();
 }
 
 function addSubtask(taskId){
@@ -978,7 +1028,7 @@ document.addEventListener('click', e=>{
   if(!e.target.closest('#linkSplitBtn')) closeLinkMenu();
 });
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renderList(); return; }
+  if(e.key==='Escape'){ closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renamingTaskId=null; renderList(); return; }
   if(e.key==='/' && !isTypingTarget(document.activeElement) && !document.querySelector('.modal-bg.open')){
     e.preventDefault();
     document.getElementById('searchInput')?.focus();
@@ -1003,12 +1053,19 @@ function addInlineSubtask(taskId){
   document.getElementById('inlineSubtaskInput')?.focus();
 }
 function handleListKeyNav(e){
-  if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter' && e.key!=='Tab') return;
+  if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter' && e.key!=='Tab' && e.key!=='Delete') return;
   if(isTypingTarget(document.activeElement)) return;
   if(document.querySelector('.modal-bg.open')) return;
   if(activeTaskId) return;
   const list = getFilteredSortedTasks();
   if(!list.length) return;
+  if(e.key==='Delete'){
+    if(kbdSelectedTaskId && list.some(t=>t.id===kbdSelectedTaskId)){
+      e.preventDefault();
+      deleteTask(kbdSelectedTaskId);
+    }
+    return;
+  }
   if(e.key==='Tab'){
     if(!kbdSelectedTaskId || !list.some(t=>t.id===kbdSelectedTaskId)) return;
     e.preventDefault();
