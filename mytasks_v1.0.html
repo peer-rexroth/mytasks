@@ -274,6 +274,12 @@
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
+
+  [role="checkbox"]:focus-visible, [role="button"]:focus-visible,
+  button:focus-visible, .icon-btn:focus-visible,
+  input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--blue-border); outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
@@ -311,19 +317,19 @@
       <input type="text" id="searchInput" placeholder="Search tasks…" oninput="setSearchQuery(this.value)">
     </div>
     <div class="sidebar-section">
-      <div class="nav-item" id="allTasksNav" onclick="setProjectFilter(null)">
+      <div class="nav-item" id="allTasksNav" role="button" tabindex="0" aria-pressed="false" onclick="setProjectFilter(null)">
         <span><i class="fa-solid fa-inbox" style="width:14px;color:var(--text-3);margin-right:6px"></i>All Tasks</span>
         <span class="count" id="allTasksCount"></span>
       </div>
-      <div class="nav-item" id="myDayNav" onclick="setMyDayFilter()">
+      <div class="nav-item" id="myDayNav" role="button" tabindex="0" aria-pressed="false" onclick="setMyDayFilter()">
         <span><i class="fa-solid fa-sun" style="width:14px;color:var(--text-3);margin-right:6px"></i>My Day</span>
         <span class="count" id="myDayCount"></span>
       </div>
-      <div class="nav-item" id="thisWeekNav" onclick="setThisWeekFilter()">
+      <div class="nav-item" id="thisWeekNav" role="button" tabindex="0" aria-pressed="false" onclick="setThisWeekFilter()">
         <span><i class="fa-solid fa-calendar-week" style="width:14px;color:var(--text-3);margin-right:6px"></i>This Week</span>
         <span class="count" id="thisWeekCount"></span>
       </div>
-      <div class="nav-item" id="overdueNav" onclick="setOverdueFilter()">
+      <div class="nav-item" id="overdueNav" role="button" tabindex="0" aria-pressed="false" onclick="setOverdueFilter()">
         <span><i class="fa-solid fa-triangle-exclamation" style="width:14px;color:var(--text-3);margin-right:6px"></i>Overdue</span>
         <span class="count" id="overdueCount"></span>
       </div>
@@ -630,36 +636,41 @@ function taskCountsForProject(pid){
   return tasks.filter(t=>t.projectId===pid && t.status!=='done').length;
 }
 
+function setNavActive(id, active){
+  const el = document.getElementById(id); if(!el) return;
+  el.classList.toggle('active', active);
+  el.setAttribute('aria-pressed', active ? 'true' : 'false');
+}
 function renderSidebar(){
-  document.getElementById('allTasksNav').classList.toggle('active', !filterProjectId && !myDayFilter && !thisWeekFilter && !overdueFilter);
+  setNavActive('allTasksNav', !filterProjectId && !myDayFilter && !thisWeekFilter && !overdueFilter);
   document.getElementById('allTasksCount').textContent = tasks.filter(t=>t.status!=='done').length;
 
-  document.getElementById('myDayNav').classList.toggle('active', myDayFilter);
+  setNavActive('myDayNav', myDayFilter);
   document.getElementById('myDayCount').textContent = tasks.filter(t=>t.dueDate===todayStr() && t.status!=='done').length;
 
-  document.getElementById('thisWeekNav').classList.toggle('active', thisWeekFilter);
+  setNavActive('thisWeekNav', thisWeekFilter);
   document.getElementById('thisWeekCount').textContent = tasks.filter(t=>isThisWeek(t.dueDate) && t.status!=='done').length;
 
-  document.getElementById('overdueNav').classList.toggle('active', overdueFilter);
+  setNavActive('overdueNav', overdueFilter);
   document.getElementById('overdueCount').textContent = tasks.filter(t=>isOverdue(t)).length;
 
   document.getElementById('statusChips').innerHTML = `
-    <div class="f-chip ${filterStatus.length===STATUSES.length?'active':''}" onclick="setStatusFilter(null)">All</div>
+    <div class="f-chip ${filterStatus.length===STATUSES.length?'active':''}" role="button" tabindex="0" aria-pressed="${filterStatus.length===STATUSES.length}" onclick="setStatusFilter(null)">All</div>
   ` + STATUSES.map(s=>{
     const active = filterStatus.includes(s.id);
-    return `<div class="f-chip ${active?'active':''}" style="${active?`background:${s.bg};color:${s.text};border-color:${s.text}`:''}" onclick="setStatusFilter('${s.id}')">${esc(s.label)}</div>`;
+    return `<div class="f-chip ${active?'active':''}" style="${active?`background:${s.bg};color:${s.text};border-color:${s.text}`:''}" role="button" tabindex="0" aria-pressed="${active}" onclick="setStatusFilter('${s.id}')">${esc(s.label)}</div>`;
   }).join('');
 
   document.getElementById('priorityChips').innerHTML = `
-    <div class="f-chip ${filterPriority.length===PRIORITIES.length?'active':''}" onclick="setPriorityFilter(null)">All</div>
+    <div class="f-chip ${filterPriority.length===PRIORITIES.length?'active':''}" role="button" tabindex="0" aria-pressed="${filterPriority.length===PRIORITIES.length}" onclick="setPriorityFilter(null)">All</div>
   ` + PRIORITIES.map(p=>{
     const active = filterPriority.includes(p.id);
-    return `<div class="f-chip ${active?'active':''}" style="${active?`background:${p.bg};color:${p.text};border-color:${p.text}`:''}" onclick="setPriorityFilter('${p.id}')">${esc(p.label)}</div>`;
+    return `<div class="f-chip ${active?'active':''}" style="${active?`background:${p.bg};color:${p.text};border-color:${p.text}`:''}" role="button" tabindex="0" aria-pressed="${active}" onclick="setPriorityFilter('${p.id}')">${esc(p.label)}</div>`;
   }).join('');
 
   document.getElementById('projectList').innerHTML = projects.map(p=>{
     const c = colorOf(p.color);
-    return `<div class="project-row ${filterProjectId===p.id?'active':''}" data-id="${p.id}" onclick="setProjectFilter('${p.id}')"
+    return `<div class="project-row ${filterProjectId===p.id?'active':''}" data-id="${p.id}" role="button" tabindex="0" aria-pressed="${filterProjectId===p.id}" onclick="setProjectFilter('${p.id}')"
       ${p.locked ? '' : `draggable="true" ondragstart="handleProjectDragStart(event,'${p.id}')" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,'${p.id}')" ondragleave="handleProjectDragLeave(event)" ondrop="handleProjectDrop(event,'${p.id}')"`}>
       <span class="dot" style="background:${c.dot}"></span>
       <span class="pname"${p.name.length>20?` data-tooltip="${esc(p.name)}"`:''}>${esc(abbreviateName(p.name))}</span>
@@ -713,7 +724,9 @@ function renderList(){
   const list = getFilteredSortedTasks();
   const el = document.getElementById('taskList');
   if(list.length===0){
-    el.innerHTML = `<div class="empty-state"><i class="fa-solid fa-clipboard-check"></i><div>${tasks.length===0?'No tasks yet — add one above.':'No tasks match your filters.'}</div></div>`;
+    el.innerHTML = tasks.length===0
+      ? `<div class="empty-state"><i class="fa-solid fa-clipboard-check"></i><div>No tasks yet</div><button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="document.getElementById('quickAddInput').focus()">Add a task</button></div>`
+      : `<div class="empty-state"><i class="fa-solid fa-clipboard-check"></i><div>No tasks match your filters.</div></div>`;
     return;
   }
   el.innerHTML = list.map(t=>{
@@ -730,7 +743,7 @@ function renderList(){
       dueCell += `<i class="fa-solid fa-repeat" style="color:var(--text-3);font-size:11px;margin-left:5px" title="Repeats ${repeatLabel(t.repeat)}"></i>`;
     }
     return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''} ${selectedTaskIds.has(t.id)?'bulk-selected':''}" data-id="${t.id}" onclick="handleRowClick(event,'${t.id}')" ondblclick="openTask('${t.id}')">
-      <div class="task-checkbox ${t.status==='done'?'checked':''}" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
+      <div class="task-checkbox ${t.status==='done'?'checked':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <div class="task-main">
         ${renamingTaskId===t.id
           ? `<input type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
@@ -742,7 +755,7 @@ function renderList(){
       <div class="task-cell due">${dueCell}</div>
       ${(subTotal>0||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks">${t.subtasks.map(s=>`
         <div class="task-subtask-row ${s.done?'done':''}">
-          <div class="mini-check ${s.done?'checked':''}" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
+          <div class="mini-check ${s.done?'checked':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
           ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
             ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputList" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
             : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','list')">${esc(s.text)}</span>`}
@@ -887,7 +900,7 @@ function renderDrawer(){
 
   drawer.innerHTML = `
     <div class="drawer-header">
-      <div class="task-checkbox ${t.status==='done'?'checked':''}" style="margin-top:6px" onclick="toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
+      <div class="task-checkbox ${t.status==='done'?'checked':''}" style="margin-top:6px" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <input class="title-input" id="drawerTitleInput" value="${esc(t.title)}" oninput="updateTaskFieldLive('${t.id}','title',this.value)" placeholder="Task title">
       <button class="icon-btn" onclick="closeDrawer()" title="Close"><i class="fa-solid fa-xmark"></i></button>
     </div>
@@ -930,7 +943,7 @@ function renderDrawer(){
         ${subTotal>0?`<div class="subtask-progress">${subDone}/${subTotal} complete</div>`:''}
         ${(t.subtasks||[]).map(s=>`
           <div class="subtask-row ${s.done?'done':''}">
-            <div class="sub-check ${s.done?'checked':''}" onclick="toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
+            <div class="sub-check ${s.done?'checked':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
             ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
               ? `<input type="text" class="sub-text-input" id="renameSubtaskInputDrawer" value="${esc(s.text)}" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
               : `<div class="sub-text" ondblclick="startRenameSubtask('${t.id}','${s.id}','drawer')">${esc(s.text)}</div>`}
@@ -1318,6 +1331,15 @@ document.addEventListener('keydown', e=>{
     const el = document.activeElement;
     if(el && (el.id==='quickAddInput' || el.id==='searchInput')) el.blur();
     return;
+  }
+  if(e.key==='Enter' || e.key===' '){
+    const el = document.activeElement;
+    const activeRole = el && el.getAttribute && el.getAttribute('role');
+    if(el && el.tagName==='DIV' && (activeRole==='checkbox' || activeRole==='button')){
+      e.preventDefault();
+      el.click();
+      return;
+    }
   }
   if((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase()==='z' && !isTypingTarget(document.activeElement) && !document.querySelector('.modal-bg.open')){
     if(toastUndoAction){
