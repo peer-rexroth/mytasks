@@ -25,6 +25,8 @@
     --purple-bg: #eeedfe; --purple-text: #3c3489;
     --coral-bg: #faece7; --coral-text: #993c1d;
     --pink-bg: #fbeaf0; --pink-text: #72243e;
+    --blue-dot: #3b82f6; --teal-dot: #14b8a6; --amber-dot: #f59e0b; --red-dot: #ef4444;
+    --green-dot: #22c55e; --purple-dot: #a855f7; --coral-dot: #fb7154; --pink-dot: #ec4899;
     --radius: 8px; --radius-lg: 12px;
     --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
@@ -478,14 +480,14 @@ const STORAGE_KEY = 'mytasks_data_v1';
 const THEME_KEY = 'mytasks_theme';
 const COMPACT_KEY = 'mytasks_compact';
 const CAT_COLORS = [
-  {name:'blue',   dot:'var(--blue-text)',   bg:'var(--blue-bg)',   text:'var(--blue-text)'},
-  {name:'teal',   dot:'var(--teal-text)',   bg:'var(--teal-bg)',   text:'var(--teal-text)'},
-  {name:'amber',  dot:'var(--amber-text)',  bg:'var(--amber-bg)',  text:'var(--amber-text)'},
-  {name:'red',    dot:'var(--red-text)',    bg:'var(--red-bg)',    text:'var(--red-text)'},
-  {name:'green',  dot:'var(--green-text)',  bg:'var(--green-bg)',  text:'var(--green-text)'},
-  {name:'purple', dot:'var(--purple-text)', bg:'var(--purple-bg)', text:'var(--purple-text)'},
-  {name:'coral',  dot:'var(--coral-text)',  bg:'var(--coral-bg)',  text:'var(--coral-text)'},
-  {name:'pink',   dot:'var(--pink-text)',   bg:'var(--pink-bg)',   text:'var(--pink-text)'}
+  {name:'blue',   dot:'var(--blue-dot)',   bg:'var(--blue-bg)',   text:'var(--blue-text)'},
+  {name:'teal',   dot:'var(--teal-dot)',   bg:'var(--teal-bg)',   text:'var(--teal-text)'},
+  {name:'amber',  dot:'var(--amber-dot)',  bg:'var(--amber-bg)',  text:'var(--amber-text)'},
+  {name:'red',    dot:'var(--red-dot)',    bg:'var(--red-bg)',    text:'var(--red-text)'},
+  {name:'green',  dot:'var(--green-dot)',  bg:'var(--green-bg)',  text:'var(--green-text)'},
+  {name:'purple', dot:'var(--purple-dot)', bg:'var(--purple-bg)', text:'var(--purple-text)'},
+  {name:'coral',  dot:'var(--coral-dot)',  bg:'var(--coral-bg)',  text:'var(--coral-text)'},
+  {name:'pink',   dot:'var(--pink-dot)',   bg:'var(--pink-bg)',   text:'var(--pink-text)'}
 ];
 const STATUSES = [
   {id:'todo',  label:'Not Started', bg:'var(--bg-3)',    text:'var(--text-2)'},
