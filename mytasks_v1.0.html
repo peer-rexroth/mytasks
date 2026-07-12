@@ -823,6 +823,9 @@ function updateTaskField(id, field, value){
     return;
   }
   t[field] = value;
+  if(field==='repeat' && value!=='none' && !t.dueDate){
+    t.dueDate = todayStr();
+  }
   t.updatedAt = Date.now();
   save(); render();
 }
