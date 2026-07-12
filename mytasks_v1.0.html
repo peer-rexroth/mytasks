@@ -278,6 +278,10 @@
       <input type="text" id="searchInput" placeholder="Search tasks…" oninput="setSearchQuery(this.value)">
     </div>
     <div class="sidebar-section">
+      <div class="nav-item" id="myDayNav" onclick="setMyDayFilter()">
+        <span><i class="fa-solid fa-sun" style="width:14px;color:var(--text-3);margin-right:6px"></i>My Day</span>
+        <span class="count" id="myDayCount"></span>
+      </div>
       <div class="nav-item" id="allTasksNav" onclick="setProjectFilter(null)">
         <span><i class="fa-solid fa-inbox" style="width:14px;color:var(--text-3);margin-right:6px"></i>All Tasks</span>
         <span class="count" id="allTasksCount"></span>
@@ -420,6 +424,7 @@ let activeTaskId = null;
 let kbdSelectedTaskId = null;
 let inlineAddSubtaskTaskId = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id);
+let myDayFilter = false;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
 let modalTarget = null, pendingImportData = null;
@@ -461,6 +466,7 @@ function load(){
       filterProjectId = d.filterProjectId ?? null;
       filterStatus = normStatusFilter(d.filterStatus);
       filterPriority = normPriorityFilter(d.filterPriority);
+      myDayFilter = d.myDayFilter ?? false;
       sortBy = d.sortBy || 'smart';
       if(d.theme){ currentTheme=d.theme; document.documentElement.setAttribute('data-theme',d.theme); localStorage.setItem(THEME_KEY,d.theme); }
     } else {
@@ -484,7 +490,7 @@ function load(){
   }
 }
 function save(){
-  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, sortBy, theme: currentTheme };
+  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, sortBy, theme: currentTheme };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(fileHandle) fileSyncWrite(data).catch(()=>{});
 }
@@ -517,8 +523,11 @@ function taskCountsForProject(pid){
 }
 
 function renderSidebar(){
-  document.getElementById('allTasksNav').classList.toggle('active', !filterProjectId);
+  document.getElementById('allTasksNav').classList.toggle('active', !filterProjectId && !myDayFilter);
   document.getElementById('allTasksCount').textContent = tasks.filter(t=>t.status!=='done').length;
+
+  document.getElementById('myDayNav').classList.toggle('active', myDayFilter);
+  document.getElementById('myDayCount').textContent = tasks.filter(t=>t.dueDate===todayStr() && t.status!=='done').length;
 
   document.getElementById('statusChips').innerHTML = `
     <div class="f-chip ${filterStatus.length===STATUSES.length?'active':''}" onclick="setStatusFilter(null)">All</div>
@@ -550,7 +559,7 @@ function renderSidebar(){
   const total = tasks.length, done = tasks.filter(t=>t.status==='done').length;
   document.getElementById('sidebarFooter').textContent = `${total} task${total===1?'':'s'} · ${done} done`;
 
-  document.getElementById('mainTitle').textContent = filterProjectId ? (projById(filterProjectId)?.name || 'All Tasks') : 'All Tasks';
+  document.getElementById('mainTitle').textContent = myDayFilter ? 'My Day' : (filterProjectId ? (projById(filterProjectId)?.name || 'All Tasks') : 'All Tasks');
   document.getElementById('sortSelect').value = sortBy;
 }
 
@@ -565,6 +574,7 @@ const sortComparators = {
 function getFilteredSortedTasks(){
   let list = tasks.filter(t=>{
     if(filterProjectId && t.projectId!==filterProjectId) return false;
+    if(myDayFilter && t.dueDate!==todayStr()) return false;
     if(!filterStatus.includes(t.status)) return false;
     if(!filterPriority.includes(t.priority)) return false;
     if(searchQuery){
@@ -812,7 +822,8 @@ function deleteProject(id){
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
-function setProjectFilter(id){ filterProjectId = id; save(); render(); }
+function setProjectFilter(id){ filterProjectId = id; myDayFilter = false; save(); render(); }
+function setMyDayFilter(){ myDayFilter = true; filterProjectId = null; save(); render(); }
 function setStatusFilter(s){
   if(s===null){
     filterStatus = filterStatus.length===STATUSES.length ? [] : STATUSES.map(x=>x.id);
@@ -1059,7 +1070,7 @@ async function createNewLinkedFile(){
     });
     fileHandle = handle;
     try{ await _fsPut(handle); }catch(_){}
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, sortBy, theme:currentTheme});
+    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, sortBy, theme:currentTheme});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not create file', true); }
@@ -1090,7 +1101,7 @@ async function linkFile(){
       }
       return;
     }
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, sortBy, theme:currentTheme});
+    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, sortBy, theme:currentTheme});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not link file', true); }
@@ -1110,6 +1121,7 @@ async function reconnectFile(){
       if(data.filterProjectId!==undefined) filterProjectId = data.filterProjectId;
       if(data.filterStatus!==undefined) filterStatus = normStatusFilter(data.filterStatus);
       if(data.filterPriority!==undefined) filterPriority = normPriorityFilter(data.filterPriority);
+      if(data.myDayFilter!==undefined) myDayFilter = data.myDayFilter;
       render();
     }
     updateFileSyncUI();
@@ -1151,6 +1163,7 @@ async function initFileSync(){
           if(data.filterProjectId!==undefined) filterProjectId = data.filterProjectId;
           if(data.filterStatus!==undefined) filterStatus = normStatusFilter(data.filterStatus);
           if(data.filterPriority!==undefined) filterPriority = normPriorityFilter(data.filterPriority);
+          if(data.myDayFilter!==undefined) myDayFilter = data.myDayFilter;
           render();
         }
       }catch(_){ /* read failed — keep localStorage data */ }
