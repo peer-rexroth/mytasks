@@ -414,7 +414,7 @@ const PRIORITIES = [
 // ── State ─────────────────────────────────────────────────────────────────────
 let projects = [], tasks = [];
 let activeTaskId = null;
-let filterProjectId = null, filterStatus = [], filterPriority = null;
+let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = null;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
 let modalTarget = null, pendingImportData = null;
@@ -486,7 +486,7 @@ function save(){
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
-function normStatusFilter(v){ if(Array.isArray(v)) return v; if(v) return [v]; return []; }
+function normStatusFilter(v){ if(Array.isArray(v)) return v; if(v) return [v]; return STATUSES.map(s=>s.id); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function projById(id){ return projects.find(p=>p.id===id); }
 function colorOf(name){ return CAT_COLORS.find(c=>c.name===name) || CAT_COLORS[0]; }
@@ -514,7 +514,7 @@ function renderSidebar(){
   document.getElementById('allTasksCount').textContent = tasks.filter(t=>t.status!=='done').length;
 
   document.getElementById('statusChips').innerHTML = `
-    <div class="f-chip ${filterStatus.length===0?'active':''}" onclick="setStatusFilter(null)">All</div>
+    <div class="f-chip ${filterStatus.length===STATUSES.length?'active':''}" onclick="setStatusFilter(null)">All</div>
   ` + STATUSES.map(s=>{
     const active = filterStatus.includes(s.id);
     return `<div class="f-chip ${active?'active':''}" style="${active?`background:${s.bg};color:${s.text};border-color:${s.text}`:''}" onclick="setStatusFilter('${s.id}')">${esc(s.label)}</div>`;
@@ -557,7 +557,7 @@ const sortComparators = {
 function getFilteredSortedTasks(){
   let list = tasks.filter(t=>{
     if(filterProjectId && t.projectId!==filterProjectId) return false;
-    if(filterStatus.length && !filterStatus.includes(t.status)) return false;
+    if(!filterStatus.includes(t.status)) return false;
     if(filterPriority && t.priority!==filterPriority) return false;
     if(searchQuery){
       const q = searchQuery.toLowerCase();
@@ -803,7 +803,10 @@ function deleteProject(id){
 // ── Filters ───────────────────────────────────────────────────────────────────
 function setProjectFilter(id){ filterProjectId = id; save(); render(); }
 function setStatusFilter(s){
-  if(s===null){ filterStatus = []; save(); render(); return; }
+  if(s===null){
+    filterStatus = filterStatus.length===STATUSES.length ? [] : STATUSES.map(x=>x.id);
+    save(); render(); return;
+  }
   filterStatus = filterStatus.includes(s) ? filterStatus.filter(x=>x!==s) : [...filterStatus, s];
   save(); render();
 }
