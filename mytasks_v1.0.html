@@ -132,6 +132,11 @@
   .quickadd i { color: var(--text-3); margin-left: 10px; font-size: 13px; }
   .quickadd input { flex: 1; border: none; padding: 9px 10px; font-size: 14px; background: transparent; color: var(--text); outline: none; font-family: var(--font); }
 
+  .bulk-bar { align-items: center; gap: 8px; margin: 10px 20px 0; padding: 8px 10px; background: var(--purple-bg); border: 0.5px solid var(--purple-text); border-radius: var(--radius); flex-wrap: wrap; }
+  .bulk-bar .bulk-count { font-size: 12px; font-weight: 600; color: var(--purple-text); margin-right: 4px; }
+  .bulk-bar select { font-size: 12px; border: 0.5px solid var(--border-2); border-radius: var(--radius); padding: 5px 8px; background: var(--bg); color: var(--text); font-family: var(--font); }
+  .task-row.bulk-selected { background: var(--purple-bg); border-color: var(--purple-text); box-shadow: 0 0 0 1px var(--purple-text); }
+
   .task-list { flex: 1; overflow-y: auto; padding: 0 14px 20px; }
   .task-list-header, .task-row { grid-template-columns: 28px minmax(0,1fr) 150px 100px 120px 130px 52px; }
   .task-list-header { display: grid; column-gap: 10px; padding: 0 10px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); border-bottom: 0.5px solid var(--border); margin-bottom: 4px; position: sticky; top: 0; background: var(--bg-2); z-index: 5; }
@@ -331,6 +336,7 @@
         <option value="alpha">Alphabetical</option>
       </select>
     </div>
+    <div class="bulk-bar" id="bulkBar" style="display:none"></div>
     <div class="quickadd">
       <i class="fa-solid fa-plus"></i>
       <input type="text" id="quickAddInput" placeholder="Add a task and press Enter…" onkeydown="quickAddTask(event)">
@@ -450,6 +456,8 @@ let activeTaskId = null;
 let kbdSelectedTaskId = null;
 let renamingTaskId = null;
 let renamingSubtask = null; // {taskId, subId}
+let selectedTaskIds = new Set();
+let lastClickedTaskId = null;
 let inlineAddSubtaskTaskId = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id);
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
@@ -575,6 +583,7 @@ function render(){
   renderSidebar();
   renderList();
   renderDrawer();
+  renderBulkBar();
 }
 
 function taskCountsForProject(pid){
@@ -680,7 +689,7 @@ function renderList(){
     if(t.repeat && t.repeat!=='none'){
       dueCell += `<i class="fa-solid fa-repeat" style="color:var(--text-3);font-size:11px;margin-left:5px" title="Repeats ${repeatLabel(t.repeat)}"></i>`;
     }
-    return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''}" data-id="${t.id}" onclick="openTask('${t.id}')">
+    return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''} ${selectedTaskIds.has(t.id)?'bulk-selected':''}" data-id="${t.id}" onclick="handleRowClick(event,'${t.id}')">
       <div class="task-checkbox ${t.status==='done'?'checked':''}" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <div class="task-main">
         ${renamingTaskId===t.id
@@ -712,6 +721,111 @@ function renderList(){
 // ── Drawer ────────────────────────────────────────────────────────────────────
 function openTask(id){ activeTaskId = id; kbdSelectedTaskId = id; inlineAddSubtaskTaskId = null; renderDrawer(); renderList(); }
 function closeDrawer(){ activeTaskId = null; renderDrawer(); }
+
+// ── Bulk selection ────────────────────────────────────────────────────────────
+function handleRowClick(e, id){
+  if(e.shiftKey && lastClickedTaskId){
+    const ids = getFilteredSortedTasks().map(t=>t.id);
+    const a = ids.indexOf(lastClickedTaskId), b = ids.indexOf(id);
+    if(a!==-1 && b!==-1){
+      const [start,end] = a<b ? [a,b] : [b,a];
+      for(let i=start;i<=end;i++) selectedTaskIds.add(ids[i]);
+      renderList(); renderBulkBar();
+      return;
+    }
+  }
+  if(e.ctrlKey || e.metaKey){
+    if(selectedTaskIds.has(id)) selectedTaskIds.delete(id); else selectedTaskIds.add(id);
+    lastClickedTaskId = id;
+    renderList(); renderBulkBar();
+    return;
+  }
+  if(selectedTaskIds.size>0){
+    selectedTaskIds.clear();
+    renderList(); renderBulkBar();
+  }
+  lastClickedTaskId = id;
+  openTask(id);
+}
+function clearSelection(){ selectedTaskIds.clear(); renderList(); renderBulkBar(); }
+function renderBulkBar(){
+  const bar = document.getElementById('bulkBar'); if(!bar) return;
+  if(selectedTaskIds.size===0){ bar.style.display='none'; bar.innerHTML=''; return; }
+  bar.style.display='flex';
+  const statusOpts = STATUSES.map(s=>`<option value="${s.id}">${esc(s.label)}</option>`).join('');
+  const priorityOpts = PRIORITIES.map(p=>`<option value="${p.id}">${esc(p.label)}</option>`).join('');
+  const projectOpts = projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  const n = selectedTaskIds.size;
+  bar.innerHTML = `
+    <span class="bulk-count">${n} selected</span>
+    <select onchange="if(this.value)bulkSetStatus(this.value); this.value='';">
+      <option value="">Set status…</option>${statusOpts}
+    </select>
+    <select onchange="if(this.value)bulkSetPriority(this.value); this.value='';">
+      <option value="">Set priority…</option>${priorityOpts}
+    </select>
+    <select onchange="if(this.value)bulkMoveProject(this.value); this.value='';">
+      <option value="">Move to…</option>${projectOpts}
+    </select>
+    <button class="btn btn-sm btn-danger" onclick="bulkDelete()"><i class="fa-solid fa-trash"></i> Delete</button>
+    <button class="btn btn-sm" onclick="clearSelection()"><i class="fa-solid fa-xmark"></i> Clear</button>
+  `;
+}
+function bulkSetStatus(status){
+  const ids = [...selectedTaskIds];
+  const prev = ids.map(id=>{ const t=tasks.find(x=>x.id===id); return t?{id, status:t.status}:null; }).filter(Boolean);
+  ids.forEach(id=>{ const t=tasks.find(x=>x.id===id); if(t){ t.status=status; t.updatedAt=Date.now(); } });
+  save(); render();
+  showToast(`Status updated for ${ids.length} task${ids.length===1?'':'s'}`, false, ()=>{
+    prev.forEach(p=>{ const t=tasks.find(x=>x.id===p.id); if(t){ t.status=p.status; t.updatedAt=Date.now(); } });
+    save(); render();
+  });
+}
+function bulkSetPriority(priority){
+  const ids = [...selectedTaskIds];
+  const prev = ids.map(id=>{ const t=tasks.find(x=>x.id===id); return t?{id, priority:t.priority}:null; }).filter(Boolean);
+  ids.forEach(id=>{ const t=tasks.find(x=>x.id===id); if(t){ t.priority=priority; t.updatedAt=Date.now(); } });
+  save(); render();
+  showToast(`Priority updated for ${ids.length} task${ids.length===1?'':'s'}`, false, ()=>{
+    prev.forEach(p=>{ const t=tasks.find(x=>x.id===p.id); if(t){ t.priority=p.priority; t.updatedAt=Date.now(); } });
+    save(); render();
+  });
+}
+function bulkMoveProject(projectId){
+  const ids = [...selectedTaskIds];
+  const prev = ids.map(id=>{ const t=tasks.find(x=>x.id===id); return t?{id, projectId:t.projectId}:null; }).filter(Boolean);
+  ids.forEach(id=>{ const t=tasks.find(x=>x.id===id); if(t){ t.projectId=projectId; t.updatedAt=Date.now(); } });
+  save(); render();
+  showToast(`Moved ${ids.length} task${ids.length===1?'':'s'}`, false, ()=>{
+    prev.forEach(p=>{ const t=tasks.find(x=>x.id===p.id); if(t){ t.projectId=p.projectId; t.updatedAt=Date.now(); } });
+    save(); render();
+  });
+}
+function bulkDelete(){
+  const ids = [...selectedTaskIds];
+  if(!ids.length) return;
+  openConfirmModal({
+    title: `Delete ${ids.length} task${ids.length===1?'':'s'}?`,
+    body: 'You can undo this from the toast right after deleting.',
+    action: ()=>{
+      const removed = [];
+      ids.forEach(id=>{
+        const idx = tasks.findIndex(t=>t.id===id);
+        if(idx!==-1) removed.push({idx, task:tasks[idx]});
+      });
+      removed.slice().sort((a,b)=>b.idx-a.idx).forEach(r=>tasks.splice(r.idx,1));
+      if(activeTaskId && ids.includes(activeTaskId)) activeTaskId=null;
+      if(kbdSelectedTaskId && ids.includes(kbdSelectedTaskId)) kbdSelectedTaskId=null;
+      selectedTaskIds.clear();
+      save(); render();
+      showToast(`${removed.length} task${removed.length===1?'':'s'} deleted`, false, ()=>{
+        removed.slice().sort((a,b)=>a.idx-b.idx).forEach(r=>tasks.splice(Math.min(r.idx,tasks.length),0,r.task));
+        save(); render();
+        showToast('Tasks restored');
+      });
+    }
+  });
+}
 
 function renderDrawer(){
   const overlay = document.getElementById('drawerOverlay');
@@ -815,11 +929,19 @@ function quickAddTask(event){
 function toggleTaskDone(id){
   const t = tasks.find(x=>x.id===id); if(!t) return;
   if(t.status!=='done' && t.repeat && t.repeat!=='none'){
+    const prevDueDate = t.dueDate;
+    const prevSubtasks = (t.subtasks||[]).map(s=>({...s}));
     t.dueDate = nextOccurrence(t.dueDate, t.repeat);
     (t.subtasks||[]).forEach(s=>{ s.done=false; });
     t.updatedAt = Date.now();
     save(); render();
-    showToast(`Recurring task rescheduled to ${fmtDate(t.dueDate)}`);
+    showToast(`Recurring task rescheduled to ${fmtDate(t.dueDate)}`, false, ()=>{
+      const task = tasks.find(x=>x.id===id); if(!task) return;
+      task.dueDate = prevDueDate;
+      task.subtasks = prevSubtasks;
+      task.updatedAt = Date.now();
+      save(); render();
+    });
     return;
   }
   t.status = t.status==='done' ? 'todo' : 'done';
@@ -833,12 +955,21 @@ function updateTaskField(id, field, value){
     toggleTaskDone(id);
     return;
   }
+  const prevValue = t[field];
+  const prevDueDate = t.dueDate;
   t[field] = value;
   if(field==='repeat' && value!=='none' && !t.dueDate){
     t.dueDate = todayStr();
   }
   t.updatedAt = Date.now();
   save(); render();
+  showToast('Task updated', false, ()=>{
+    const task = tasks.find(x=>x.id===id); if(!task) return;
+    task[field] = prevValue;
+    task.dueDate = prevDueDate;
+    task.updatedAt = Date.now();
+    save(); render();
+  });
 }
 // lighter update for text fields being typed live — avoids rebuilding the drawer mid-keystroke
 function updateTaskFieldLive(id, field, value){
@@ -1127,7 +1258,7 @@ document.addEventListener('click', e=>{
   if(!e.target.closest('#linkSplitBtn')) closeLinkMenu();
 });
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renamingTaskId=null; renamingSubtask=null; renderList(); return; }
+  if(e.key==='Escape'){ closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renamingTaskId=null; renamingSubtask=null; selectedTaskIds.clear(); renderList(); renderBulkBar(); return; }
   if((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase()==='z' && !isTypingTarget(document.activeElement) && !document.querySelector('.modal-bg.open')){
     if(toastUndoAction){
       e.preventDefault();
