@@ -685,7 +685,7 @@ function renderList(){
     if(t.dueDate){
       const overdue = isOverdue(t);
       const isToday = t.dueDate === todayStr();
-      dueCell = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${overdue?'Overdue · ':''}${fmtDate(t.dueDate)}</span>`;
+      dueCell = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${fmtDate(t.dueDate)}</span>`;
     }
     if(t.repeat && t.repeat!=='none'){
       dueCell += `<i class="fa-solid fa-repeat" style="color:var(--text-3);font-size:11px;margin-left:5px" title="Repeats ${repeatLabel(t.repeat)}"></i>`;
