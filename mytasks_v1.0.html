@@ -1421,14 +1421,21 @@ function handleListKeyNav(e){
     return;
   }
   e.preventDefault();
+  const hadInlineAdd = inlineAddSubtaskTaskId !== null;
   inlineAddSubtaskTaskId = null;
   const idx = list.findIndex(t=>t.id===kbdSelectedTaskId);
   let next;
   if(idx===-1) next = 0;
   else if(e.key==='ArrowDown') next = Math.min(idx+1, list.length-1);
   else next = Math.max(idx-1, 0);
+  const prevId = kbdSelectedTaskId;
   kbdSelectedTaskId = list[next].id;
-  renderList();
+  if(hadInlineAdd){
+    renderList();
+  } else {
+    if(prevId){ document.querySelector(`.task-row[data-id="${prevId}"]`)?.classList.remove('kbd-selected'); }
+    document.querySelector(`.task-row[data-id="${kbdSelectedTaskId}"]`)?.classList.add('kbd-selected');
+  }
   document.querySelector(`.task-row[data-id="${kbdSelectedTaskId}"]`)?.scrollIntoView({block:'nearest'});
 }
 
