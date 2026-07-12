@@ -139,6 +139,11 @@
   .task-row.kbd-selected { background: var(--bg); border-color: var(--blue-border); box-shadow: 0 0 0 1px var(--blue-border); }
   .task-row.kbd-selected .row-delete { opacity: 1; }
   .task-row.done .task-title { text-decoration: line-through; color: var(--text-3); }
+  .task-row.dragging { opacity: 0.4; }
+  .task-row.drag-over-top { box-shadow: inset 0 2px 0 0 var(--blue-text); }
+  .task-row.drag-over-bottom { box-shadow: inset 0 -2px 0 0 var(--blue-text); }
+  .task-row.drag-over-nest { background: var(--blue-bg); box-shadow: inset 0 0 0 1.5px var(--blue-text); }
+  .task-subtask-row.dragging { opacity: 0.4; }
 
   .task-checkbox { grid-area: check; width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: all .15s; align-self: start; }
   .task-checkbox:hover { border-color: var(--green-text); }
@@ -159,7 +164,7 @@
   .badge-status-done { background: var(--green-bg); color: var(--green-text); }
 
   .task-subtasks { grid-area: sub; padding-left: 10px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
-  .task-subtask-row { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); }
+  .task-subtask-row { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); cursor: grab; }
   .task-subtask-row .mini-check { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg-2); transition: all .15s; }
   .task-subtask-row .mini-check:hover { border-color: var(--green-text); }
   .task-subtask-row .mini-check.checked { background: var(--green-text); border-color: var(--green-text); }
@@ -307,6 +312,7 @@
       <div class="main-title" id="mainTitle">All Tasks</div>
       <select id="sortSelect" onchange="setSortBy(this.value)">
         <option value="smart">Smart order</option>
+        <option value="manual">Manual order</option>
         <option value="due">Due date</option>
         <option value="priority">Priority</option>
         <option value="created">Newest first</option>
@@ -317,7 +323,7 @@
       <i class="fa-solid fa-plus"></i>
       <input type="text" id="quickAddInput" placeholder="Add a task and press Enter…" onkeydown="quickAddTask(event)">
     </div>
-    <div class="task-list">
+    <div class="task-list" ondragover="handleListDragOver(event)" ondrop="handleListDrop(event)">
       <div class="task-list-header"><span></span><span>Task</span><span>Project</span><span>Priority</span><span>Status</span><span>Due</span><span></span></div>
       <div id="taskList"></div>
     </div>
@@ -560,6 +566,7 @@ function renderSidebar(){
 }
 
 const sortComparators = {
+  manual: (a,b)=>0,
   smart: (a,b)=>{ const pr={high:0,medium:1,low:2}; if(pr[a.priority]!==pr[b.priority]) return pr[a.priority]-pr[b.priority]; const ad=a.dueDate||'9999-99-99', bd=b.dueDate||'9999-99-99'; if(ad!==bd) return ad<bd?-1:1; return b.createdAt-a.createdAt; },
   due: (a,b)=>{ const ad=a.dueDate||'9999-99-99', bd=b.dueDate||'9999-99-99'; return ad<bd?-1:ad>bd?1:0; },
   priority: (a,b)=>{ const pr={high:0,medium:1,low:2}; return pr[a.priority]-pr[b.priority]; },
@@ -605,7 +612,10 @@ function renderList(){
       const isToday = t.dueDate === todayStr();
       dueCell = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${overdue?'Overdue · ':''}${fmtDate(t.dueDate)}</span>`;
     }
-    return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''}" data-id="${t.id}" onclick="openTask('${t.id}')">
+    return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''}" data-id="${t.id}" draggable="true"
+      ondragstart="handleTaskDragStart(event,'${t.id}')" ondragend="handleDragEnd(event)"
+      ondragover="handleTaskDragOver(event,'${t.id}')" ondragleave="handleTaskDragLeave(event)" ondrop="handleTaskDrop(event,'${t.id}')"
+      onclick="openTask('${t.id}')">
       <div class="task-checkbox ${t.status==='done'?'checked':''}" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <div class="task-main">
         <span class="task-title">${esc(t.title)}</span>
@@ -615,7 +625,8 @@ function renderList(){
       <div class="task-cell status"><span class="badge badge-status-${t.status}">${statusLabel(t.status)}</span></div>
       <div class="task-cell due">${dueCell}</div>
       ${(subTotal>0||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks">${t.subtasks.map(s=>`
-        <div class="task-subtask-row ${s.done?'done':''}">
+        <div class="task-subtask-row ${s.done?'done':''}" draggable="true"
+          ondragstart="handleSubtaskDragStart(event,'${t.id}','${s.id}')" ondragend="handleDragEnd(event)">
           <div class="mini-check ${s.done?'checked':''}" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
           <span>${esc(s.text)}</span>
         </div>
@@ -773,6 +784,129 @@ function deleteSubtask(taskId, subId){
   t.updatedAt = Date.now();
   save(); render();
 }
+
+// ── Drag & Drop ───────────────────────────────────────────────────────────────
+let dragState = null; // {type:'task', id} | {type:'subtask', taskId, subId}
+
+function handleTaskDragStart(e, id){
+  dragState = { type:'task', id };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', id);
+  e.currentTarget.classList.add('dragging');
+}
+function handleSubtaskDragStart(e, taskId, subId){
+  dragState = { type:'subtask', taskId, subId };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', subId);
+  e.stopPropagation();
+  e.currentTarget.classList.add('dragging');
+}
+function handleDragEnd(e){
+  dragState = null;
+  document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));
+  document.querySelectorAll('.drag-over-top,.drag-over-bottom,.drag-over-nest').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom','drag-over-nest'));
+}
+function computeDropZone(e){
+  if(dragState.type==='subtask' || sortBy!=='manual') return 'nest';
+  const rect = e.currentTarget.getBoundingClientRect();
+  const ratio = (e.clientY - rect.top) / rect.height;
+  if(ratio < 0.25) return 'top';
+  if(ratio > 0.75) return 'bottom';
+  return 'nest';
+}
+function canNestOnto(targetId){
+  if(!dragState) return false;
+  if(dragState.type==='task') return dragState.id!==targetId;
+  return dragState.taskId!==targetId;
+}
+function handleTaskDragOver(e, targetId){
+  if(!dragState) return;
+  if(dragState.type==='task' && dragState.id===targetId) return;
+  const zone = computeDropZone(e);
+  if(zone==='nest' && !canNestOnto(targetId)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const row = e.currentTarget;
+  row.classList.remove('drag-over-top','drag-over-bottom','drag-over-nest');
+  row.classList.add(zone==='nest' ? 'drag-over-nest' : zone==='top' ? 'drag-over-top' : 'drag-over-bottom');
+}
+function handleTaskDragLeave(e){
+  e.currentTarget.classList.remove('drag-over-top','drag-over-bottom','drag-over-nest');
+}
+function handleTaskDrop(e, targetId){
+  if(!dragState) return;
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.remove('drag-over-top','drag-over-bottom','drag-over-nest');
+  const zone = computeDropZone(e);
+  if(zone==='nest') nestIntoTask(targetId);
+  else reorderTask(targetId, zone);
+  dragState = null;
+}
+function handleListDragOver(e){
+  if(!dragState || dragState.type!=='subtask') return;
+  e.preventDefault();
+}
+function handleListDrop(e){
+  if(!dragState || dragState.type!=='subtask') return;
+  e.preventDefault();
+  promoteSubtaskToTask(dragState.taskId, dragState.subId);
+  dragState = null;
+}
+function nestIntoTask(targetId){
+  if(!canNestOnto(targetId)) return;
+  const target = tasks.find(t=>t.id===targetId); if(!target) return;
+  if(dragState.type==='task'){
+    const src = tasks.find(t=>t.id===dragState.id); if(!src) return;
+    if((src.subtasks||[]).length>0){ showToast("Can't nest a task that has its own subtasks", true); return; }
+    target.subtasks = target.subtasks||[];
+    target.subtasks.push({id:genId(), text:src.title, done: src.status==='done'});
+    target.updatedAt = Date.now();
+    tasks = tasks.filter(t=>t.id!==src.id);
+    if(activeTaskId===src.id) activeTaskId=null;
+    if(kbdSelectedTaskId===src.id) kbdSelectedTaskId=null;
+    if(inlineAddSubtaskTaskId===src.id) inlineAddSubtaskTaskId=null;
+  } else {
+    const srcTask = tasks.find(t=>t.id===dragState.taskId); if(!srcTask) return;
+    const subIdx = (srcTask.subtasks||[]).findIndex(s=>s.id===dragState.subId);
+    if(subIdx===-1) return;
+    const [sub] = srcTask.subtasks.splice(subIdx,1);
+    srcTask.updatedAt = Date.now();
+    target.subtasks = target.subtasks||[];
+    target.subtasks.push(sub);
+    target.updatedAt = Date.now();
+  }
+  save(); render();
+}
+function reorderTask(targetId, zone){
+  if(dragState.type!=='task' || sortBy!=='manual') return;
+  if(dragState.id===targetId) return;
+  const srcIdx = tasks.findIndex(t=>t.id===dragState.id);
+  if(srcIdx===-1) return;
+  const [src] = tasks.splice(srcIdx,1);
+  const targetIdx = tasks.findIndex(t=>t.id===targetId);
+  if(targetIdx===-1){ tasks.push(src); }
+  else{ tasks.splice(zone==='top' ? targetIdx : targetIdx+1, 0, src); }
+  save(); render();
+}
+function promoteSubtaskToTask(taskId, subId){
+  const srcTask = tasks.find(t=>t.id===taskId); if(!srcTask) return;
+  const subIdx = (srcTask.subtasks||[]).findIndex(s=>s.id===subId);
+  if(subIdx===-1) return;
+  const [sub] = srcTask.subtasks.splice(subIdx,1);
+  srcTask.updatedAt = Date.now();
+  tasks.unshift({
+    id: genId(), title: sub.text, notes:'',
+    projectId: srcTask.projectId,
+    status: sub.done ? 'done' : 'todo',
+    priority: 'medium',
+    dueDate: null,
+    subtasks: [],
+    createdAt: Date.now(), updatedAt: Date.now()
+  });
+  save(); render();
+}
+
 // ── Project CRUD ──────────────────────────────────────────────────────────────
 function openProjectModal(id){
   editingProjectId = id || null;
@@ -836,7 +970,14 @@ function setPriorityFilter(p){
   filterPriority = filterPriority.includes(p) ? filterPriority.filter(x=>x!==p) : [...filterPriority, p];
   save(); render();
 }
-function setSortBy(v){ sortBy = v; save(); renderList(); }
+function setSortBy(v){
+  if(v==='manual' && sortBy!=='manual'){
+    const visible = getFilteredSortedTasks();
+    const visibleIds = new Set(visible.map(t=>t.id));
+    tasks = [...visible, ...tasks.filter(t=>!visibleIds.has(t.id))];
+  }
+  sortBy = v; save(); renderList();
+}
 function setSearchQuery(v){ searchQuery = v; renderList(); }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
