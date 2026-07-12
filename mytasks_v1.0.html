@@ -162,8 +162,8 @@
 
   .task-cell { grid-area: project; min-width: 0; }
   .task-cell.priority { grid-area: priority; }
-  .task-cell.status { grid-area: status; }
-  .task-cell.due { grid-area: due; }
+  .task-cell.status { grid-area: status; margin-left: -4px; }
+  .task-cell.due { grid-area: due; margin-left: -8px; }
   .task-cell-empty { color: var(--text-3); font-size: 12px; }
   .badge-status-todo { background: var(--bg-3); color: var(--text-2); }
   .badge-status-doing { background: var(--blue-bg); color: var(--blue-text); }
@@ -190,7 +190,7 @@
   .badge-due.today { background: var(--amber-bg); color: var(--amber-text); }
   .badge-project { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge-project .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-  .row-actions { grid-area: del; display: flex; justify-content: flex-end; gap: 2px; opacity: 0; transition: opacity .1s; margin-top: 1px; }
+  .row-actions { grid-area: del; display: flex; justify-content: flex-end; gap: 2px; opacity: 0; transition: opacity .1s; margin-top: 1px; margin-left: -12px; }
 
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-3); }
   .empty-state i { font-size: 30px; margin-bottom: 10px; display: block; opacity: .5; }
@@ -343,7 +343,7 @@
       <input type="text" id="quickAddInput" placeholder="Add a task and press Enter…" onkeydown="quickAddTask(event)">
     </div>
     <div class="task-list">
-      <div class="task-list-header"><span></span><span>Task</span><span>Project</span><span>Priority</span><span>Status</span><span>Due</span><span></span></div>
+      <div class="task-list-header"><span></span><span>Task</span><span>Project</span><span>Priority</span><span style="margin-left:-4px">Status</span><span style="margin-left:-8px">Due</span><span style="margin-left:-12px"></span></div>
       <div id="taskList"></div>
     </div>
   </div>
