@@ -1149,6 +1149,11 @@ document.addEventListener('keydown', e=>{
     document.getElementById('searchInput')?.focus();
     return;
   }
+  if(e.key==='n' && !e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget(document.activeElement) && !document.querySelector('.modal-bg.open')){
+    e.preventDefault();
+    document.getElementById('quickAddInput')?.focus();
+    return;
+  }
   handleListKeyNav(e);
 });
 function isTypingTarget(el){
