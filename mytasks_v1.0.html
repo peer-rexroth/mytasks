@@ -120,6 +120,8 @@
   .project-row.dragging { opacity: 0.4; }
   .project-row.drag-over-top { box-shadow: inset 0 2px 0 0 var(--blue-text); }
   .project-row.drag-over-bottom { box-shadow: inset 0 -2px 0 0 var(--blue-text); }
+  @keyframes rowSettle { 0%{ transform: scale(1.03); } 100%{ transform: scale(1); } }
+  .project-row.settle { animation: rowSettle .22s ease-out; }
   .project-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .project-row .pname { flex: 1; min-width: 0; white-space: nowrap; }
   .project-row .count { font-size: 11px; color: var(--text-3); }
@@ -137,7 +139,8 @@
   .quickadd i { color: var(--text-3); margin-left: 10px; font-size: 13px; }
   .quickadd input { flex: 1; border: none; padding: 9px 10px; font-size: 14px; background: transparent; color: var(--text); outline: none; font-family: var(--font); }
 
-  .bulk-bar { align-items: center; gap: 8px; margin: 10px 20px 0; padding: 8px 10px; background: var(--purple-bg); border: 0.5px solid var(--purple-text); border-radius: var(--radius); flex-wrap: wrap; }
+  .bulk-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--purple-bg); border: 0.5px solid var(--purple-text); border-width: 0; border-radius: var(--radius); margin: 0 20px; padding: 0 10px; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .18s ease, opacity .15s ease, padding .18s ease, margin .18s ease, border-width .18s ease; }
+  .bulk-bar.show { max-height: 60px; opacity: 1; margin: 10px 20px 0; padding: 8px 10px; border-width: 0.5px; }
   .bulk-bar .bulk-count { font-size: 12px; font-weight: 600; color: var(--purple-text); margin-right: 4px; }
   .bulk-bar select { font-size: 12px; border: 0.5px solid var(--border-2); border-radius: var(--radius); padding: 5px 8px; background: var(--bg); color: var(--text); font-family: var(--font); }
   .task-row.bulk-selected { background: var(--purple-bg); border-color: var(--purple-text); box-shadow: 0 0 0 1px var(--purple-text); }
@@ -363,7 +366,7 @@
         <option value="alpha">Alphabetical</option>
       </select>
     </div>
-    <div class="bulk-bar" id="bulkBar" style="display:none"></div>
+    <div class="bulk-bar" id="bulkBar"></div>
     <div class="quickadd">
       <i class="fa-solid fa-plus"></i>
       <input type="text" id="quickAddInput" placeholder="Add a task and press Enter…" onkeydown="quickAddTask(event)">
@@ -814,8 +817,8 @@ function handleRowClick(e, id){
 function clearSelection(){ selectedTaskIds.clear(); renderList(); renderBulkBar(); }
 function renderBulkBar(){
   const bar = document.getElementById('bulkBar'); if(!bar) return;
-  if(selectedTaskIds.size===0){ bar.style.display='none'; bar.innerHTML=''; return; }
-  bar.style.display='flex';
+  if(selectedTaskIds.size===0){ bar.classList.remove('show'); bar.innerHTML=''; return; }
+  bar.classList.add('show');
   const statusOpts = STATUSES.map(s=>`<option value="${s.id}">${esc(s.label)}</option>`).join('');
   const priorityOpts = PRIORITIES.map(p=>`<option value="${p.id}">${esc(p.label)}</option>`).join('');
   const projectOpts = projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
@@ -1271,6 +1274,7 @@ function handleProjectDrop(e, targetId){
   else{ projects.splice(zone==='top' ? targetIdx : targetIdx+1, 0, src); }
   draggedProjectId = null;
   save(); render();
+  document.querySelector(`.project-row[data-id="${src.id}"]`)?.classList.add('settle');
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
@@ -1679,24 +1683,33 @@ async function reconnectFile(){
     showToast(`Reconnected to ${fileHandle.name}`);
   }catch(e){ showToast('Could not reconnect', true); }
 }
+function fadeSwapHTML(el, html){
+  if(!el) return;
+  el.style.transition = 'opacity .12s ease';
+  el.style.opacity = '0';
+  setTimeout(()=>{
+    el.innerHTML = html;
+    requestAnimationFrame(()=>{ el.style.opacity = '1'; });
+  }, 120);
+}
 function updateFileSyncUI(){
   const el = document.getElementById('fileSyncIndicator');
   if(!el) return;
   if(!window.showOpenFilePicker){ el.style.display = 'none'; return; }
-  if(!fileHandle){ el.innerHTML = linkSplitBtnHtml(); return; }
+  if(!fileHandle){ fadeSwapHTML(el, linkSplitBtnHtml()); return; }
   fileHandle.queryPermission({mode:'readwrite'}).then(perm=>{
     if(!el) return;
     if(perm==='granted'){
-      el.innerHTML = `
+      fadeSwapHTML(el, `
         <span style="font-size:12px;color:var(--green-text);display:flex;align-items:center;gap:5px;max-width:150px">
           <i class="fa-solid fa-file-circle-check" style="flex-shrink:0"></i>
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(fileHandle.name)}">${esc(fileHandle.name)}</span>
         </span>
-        <button class="btn btn-sm" onclick="unlinkFile()" title="Unlink file" style="padding:4px 8px;line-height:1"><i class="fa-solid fa-link-slash"></i></button>`;
+        <button class="btn btn-sm" onclick="unlinkFile()" title="Unlink file" style="padding:4px 8px;line-height:1"><i class="fa-solid fa-link-slash"></i></button>`);
     } else {
-      el.innerHTML = `<button class="btn btn-sm" onclick="reconnectFile()" style="color:var(--amber-text);border-color:var(--amber-text)" title="Reconnect to ${esc(fileHandle.name)}"><i class="fa-solid fa-triangle-exclamation"></i> Reconnect</button>`;
+      fadeSwapHTML(el, `<button class="btn btn-sm" onclick="reconnectFile()" style="color:var(--amber-text);border-color:var(--amber-text)" title="Reconnect to ${esc(fileHandle.name)}"><i class="fa-solid fa-triangle-exclamation"></i> Reconnect</button>`);
     }
-  }).catch(()=>{ if(el) el.innerHTML = linkSplitBtnHtml(); });
+  }).catch(()=>{ if(el) fadeSwapHTML(el, linkSplitBtnHtml()); });
 }
 async function initFileSync(){
   if(!window.showOpenFilePicker) return;
