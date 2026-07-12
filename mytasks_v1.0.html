@@ -569,7 +569,8 @@ function getFilteredSortedTasks(){
     if(!filterPriority.includes(t.priority)) return false;
     if(searchQuery){
       const q = searchQuery.toLowerCase();
-      const hay = (t.title+' '+(t.notes||'')).toLowerCase();
+      const subtaskText = (t.subtasks||[]).map(s=>s.text).join(' ');
+      const hay = (t.title+' '+(t.notes||'')+' '+subtaskText).toLowerCase();
       if(!hay.includes(q)) return false;
     }
     return true;
