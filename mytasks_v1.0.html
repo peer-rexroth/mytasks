@@ -244,6 +244,10 @@
   .color-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
   .swatch { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
   .swatch.selected { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg); }
+  .weekday-picker { display: flex; gap: 5px; }
+  .weekday-btn { width: 30px; height: 30px; border-radius: 50%; border: 0.5px solid var(--border-2); background: var(--bg-2); color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font); }
+  .weekday-btn:hover { border-color: var(--blue-border); }
+  .weekday-btn.active { background: var(--blue-text); border-color: var(--blue-text); color: #fff; }
 
   /* modal */
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.25); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .15s ease, visibility .15s ease; }
@@ -569,6 +573,11 @@ function load(){
       if(!t.priority) t.priority='medium';
       if(!t.status) t.status='todo';
       if(!t.repeat) t.repeat='none';
+      if(!t.repeatInterval) t.repeatInterval=1;
+      if(!t.repeatWeekdays) t.repeatWeekdays=[];
+      if(t.repeatEndDate===undefined) t.repeatEndDate=null;
+      if(t.repeatMaxOccurrences===undefined) t.repeatMaxOccurrences=null;
+      if(!t.repeatOccurrenceCount) t.repeatOccurrenceCount=0;
       if(t.dueDate===undefined) t.dueDate=null;
       if(!t.notes) t.notes='';
       if(!t.createdAt) t.createdAt=Date.now();
@@ -610,23 +619,71 @@ function fmtDate(iso){
 }
 function statusLabel(id){ return (STATUSES.find(s=>s.id===id)||{}).label || id; }
 function repeatLabel(id){ return (REPEATS.find(r=>r.id===id)||{}).label || id; }
+function repeatSummary(t){
+  if(!t.repeat || t.repeat==='none') return '';
+  const interval = t.repeatInterval || 1;
+  if(t.repeat==='weekly' && (t.repeatWeekdays||[]).length>0){
+    const names = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const days = t.repeatWeekdays.slice().sort((a,b)=>a-b).map(d=>names[d]).join(', ');
+    return interval>1 ? `Every ${interval} weeks on ${days}` : `Weekly on ${days}`;
+  }
+  if(interval>1) return `Every ${interval} ${repeatUnitLabel(t.repeat, interval)}`;
+  return repeatLabel(t.repeat);
+}
 function isoFromParts(y,m,d){ return `${String(y).padStart(4,'0')}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
-function nextOccurrence(dateStr, type){
+function nextWeekdayOccurrence(dateStr, weekdays, interval){
+  const base = new Date(dateStr+'T00:00:00');
+  const baseDow = base.getDay();
+  const laterInWeek = weekdays.filter(d=>d>baseDow);
+  let result;
+  if(laterInWeek.length>0){
+    result = new Date(base);
+    result.setDate(result.getDate() + (laterInWeek[0]-baseDow));
+  } else {
+    const sunday = new Date(base);
+    sunday.setDate(sunday.getDate()-baseDow);
+    const targetSunday = new Date(sunday);
+    targetSunday.setDate(targetSunday.getDate() + interval*7);
+    result = new Date(targetSunday);
+    result.setDate(result.getDate() + weekdays[0]);
+  }
+  return isoFromParts(result.getFullYear(), result.getMonth()+1, result.getDate());
+}
+function firstWeekdayOccurrence(weekdays, interval){
+  const today = todayStr();
+  const todayDow = new Date(today+'T00:00:00').getDay();
+  if(weekdays.includes(todayDow)) return today;
+  return nextWeekdayOccurrence(today, weekdays, interval);
+}
+function nextOccurrence(dateStr, task){
+  const type = typeof task==='string' ? task : task.repeat;
+  const interval = Math.max(1, (typeof task==='object' && task.repeatInterval) || 1);
+  const weekdays = (typeof task==='object' && task.repeatWeekdays) || [];
   const base = dateStr || todayStr();
   const [y,m,day] = base.split('-').map(Number);
-  if(type==='daily'){ const d=new Date(y,m-1,day+1); return isoFromParts(d.getFullYear(),d.getMonth()+1,d.getDate()); }
-  if(type==='weekly'){ const d=new Date(y,m-1,day+7); return isoFromParts(d.getFullYear(),d.getMonth()+1,d.getDate()); }
+  if(type==='daily'){ const d=new Date(y,m-1,day+interval); return isoFromParts(d.getFullYear(),d.getMonth()+1,d.getDate()); }
+  if(type==='weekly'){
+    if(weekdays.length>0) return nextWeekdayOccurrence(base, weekdays.slice().sort((a,b)=>a-b), interval);
+    const d=new Date(y,m-1,day+interval*7); return isoFromParts(d.getFullYear(),d.getMonth()+1,d.getDate());
+  }
   if(type==='monthly'){
-    let ny=y, nm=m+1; if(nm>12){ nm=1; ny=y+1; }
+    let ny=y, nm=m+interval;
+    while(nm>12){ nm-=12; ny+=1; }
     const lastDay = new Date(ny,nm,0).getDate();
     return isoFromParts(ny, nm, Math.min(day,lastDay));
   }
   if(type==='yearly'){
-    const ny = y+1;
+    const ny = y+interval;
     const lastDay = new Date(ny,m,0).getDate();
     return isoFromParts(ny, m, Math.min(day,lastDay));
   }
   return base;
+}
+function repeatUnitLabel(repeat, interval){
+  const n = interval || 1;
+  const map = { daily:'day', weekly:'week', monthly:'month', yearly:'year' };
+  const word = map[repeat] || '';
+  return word ? `${word}${n===1?'':'s'}` : '';
 }
 function isOverdue(t){ return !!t.dueDate && t.dueDate < todayStr() && t.status!=='done'; }
 function isThisWeek(dueDate){
@@ -754,7 +811,7 @@ function renderList(){
       dueCell = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${fmtDate(t.dueDate)}</span>`;
     }
     if(t.repeat && t.repeat!=='none'){
-      dueCell += `<i class="fa-solid fa-repeat" style="color:var(--text-3);font-size:11px;margin-left:5px" title="Repeats ${repeatLabel(t.repeat)}"></i>`;
+      dueCell += `<i class="fa-solid fa-repeat" style="color:var(--text-3);font-size:11px;margin-left:5px" title="Repeats: ${esc(repeatSummary(t))}"></i>`;
     }
     return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''} ${selectedTaskIds.has(t.id)?'bulk-selected':''}" data-id="${t.id}" onclick="handleRowClick(event,'${t.id}')" ondblclick="openTask('${t.id}')">
       <div class="task-checkbox ${t.status==='done'?'checked':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
@@ -952,6 +1009,36 @@ function renderDrawer(){
           <select onchange="updateTaskField('${t.id}','repeat',this.value)">${repeatOptions}</select>
         </div>
       </div>
+      ${t.repeat && t.repeat!=='none' ? `
+      <div class="field-row">
+        <div class="field">
+          <label>Every</label>
+          <input type="number" min="1" value="${t.repeatInterval||1}" onchange="updateTaskField('${t.id}','repeatInterval', Math.max(1, parseInt(this.value)||1))">
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <div style="padding:8px 0;font-size:13px;color:var(--text-2)">${repeatUnitLabel(t.repeat, t.repeatInterval)}</div>
+        </div>
+      </div>
+      ${t.repeat==='weekly' ? `
+      <div class="field">
+        <label>On days</label>
+        <div class="weekday-picker">
+          ${['S','M','T','W','T','F','S'].map((lbl,i)=>`<button type="button" class="weekday-btn ${(t.repeatWeekdays||[]).includes(i)?'active':''}" onclick="toggleRepeatWeekday('${t.id}',${i})">${lbl}</button>`).join('')}
+        </div>
+      </div>
+      ` : ''}
+      <div class="field-row">
+        <div class="field">
+          <label>Ends on</label>
+          <input type="date" value="${t.repeatEndDate||''}" onchange="updateTaskField('${t.id}','repeatEndDate',this.value||null)">
+        </div>
+        <div class="field">
+          <label>After N times</label>
+          <input type="number" min="1" placeholder="Never" value="${t.repeatMaxOccurrences||''}" onchange="updateTaskField('${t.id}','repeatMaxOccurrences', this.value?Math.max(1,parseInt(this.value)):null)">
+        </div>
+      </div>
+      ` : ''}
       <div class="field">
         <label>Subtasks</label>
         ${subTotal>0?`<div class="subtask-progress">${subDone}/${subTotal} complete</div>`:''}
@@ -998,31 +1085,65 @@ function quickAddTask(event){
   save(); render();
 }
 
-function advanceRecurring(id, toastPrefix){
-  const t = tasks.find(x=>x.id===id); if(!t) return;
+function advanceRecurring(id){
+  const t = tasks.find(x=>x.id===id); if(!t) return null;
   const prevDueDate = t.dueDate;
   const prevSubtasks = (t.subtasks||[]).map(s=>({...s}));
-  t.dueDate = nextOccurrence(t.dueDate, t.repeat);
-  (t.subtasks||[]).forEach(s=>{ s.done=false; });
+  const prevRepeat = t.repeat;
+  const prevOccCount = t.repeatOccurrenceCount || 0;
+  const next = nextOccurrence(t.dueDate, t);
+  const newCount = prevOccCount + 1;
+  const ended = (t.repeatEndDate && next > t.repeatEndDate) || (t.repeatMaxOccurrences && newCount >= t.repeatMaxOccurrences);
+  if(ended){
+    t.repeat = 'none';
+  } else {
+    t.dueDate = next;
+    t.repeatOccurrenceCount = newCount;
+    (t.subtasks||[]).forEach(s=>{ s.done=false; });
+  }
   t.updatedAt = Date.now();
-  save(); render();
-  showToast(`${toastPrefix} ${fmtDate(t.dueDate)}`, false, ()=>{
-    const task = tasks.find(x=>x.id===id); if(!task) return;
-    task.dueDate = prevDueDate;
-    task.subtasks = prevSubtasks;
-    task.updatedAt = Date.now();
-    save(); render();
-  });
+  return {
+    ended,
+    nextDate: next,
+    undo: ()=>{
+      const task = tasks.find(x=>x.id===id); if(!task) return;
+      task.repeat = prevRepeat;
+      task.dueDate = prevDueDate;
+      task.subtasks = prevSubtasks;
+      task.repeatOccurrenceCount = prevOccCount;
+      task.updatedAt = Date.now();
+    }
+  };
 }
 function skipOccurrence(id){
   const t = tasks.find(x=>x.id===id); if(!t) return;
   if(!t.repeat || t.repeat==='none') return;
-  advanceRecurring(id, 'Skipped — next occurrence');
+  const result = advanceRecurring(id);
+  if(!result) return;
+  save(); render();
+  const msg = result.ended ? 'Recurring series ended' : `Skipped — next occurrence ${fmtDate(result.nextDate)}`;
+  showToast(msg, false, ()=>{
+    result.undo();
+    save(); render();
+  });
 }
 function toggleTaskDone(id){
   const t = tasks.find(x=>x.id===id); if(!t) return;
   if(t.status!=='done' && t.repeat && t.repeat!=='none'){
-    advanceRecurring(id, 'Recurring task rescheduled to');
+    const prevStatus = t.status;
+    const result = advanceRecurring(id);
+    if(!result) return;
+    if(result.ended) t.status = 'done';
+    t.updatedAt = Date.now();
+    save(); render();
+    const msg = result.ended ? 'Recurring series completed' : `Recurring task rescheduled to ${fmtDate(result.nextDate)}`;
+    showToast(msg, false, ()=>{
+      const task = tasks.find(x=>x.id===id); if(!task) return;
+      result.undo();
+      task.status = prevStatus;
+      task.updatedAt = Date.now();
+      save(); render();
+    });
     return;
   }
   t.status = t.status==='done' ? 'todo' : 'done';
@@ -1051,6 +1172,17 @@ function updateTaskField(id, field, value){
     task.updatedAt = Date.now();
     save(); render();
   });
+}
+function toggleRepeatWeekday(id, day){
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  const days = new Set(t.repeatWeekdays || []);
+  if(days.has(day)) days.delete(day); else days.add(day);
+  t.repeatWeekdays = [...days].sort((a,b)=>a-b);
+  if(t.repeatWeekdays.length>0){
+    t.dueDate = firstWeekdayOccurrence(t.repeatWeekdays, t.repeatInterval||1);
+  }
+  t.updatedAt = Date.now();
+  save(); render();
 }
 // lighter update for text fields being typed live — avoids rebuilding the drawer mid-keystroke
 function updateTaskFieldLive(id, field, value){
@@ -1096,6 +1228,11 @@ function duplicateTask(id){
     priority: t.priority,
     dueDate: null,
     repeat: t.repeat || 'none',
+    repeatInterval: t.repeatInterval || 1,
+    repeatWeekdays: (t.repeatWeekdays||[]).slice(),
+    repeatEndDate: t.repeatEndDate || null,
+    repeatMaxOccurrences: t.repeatMaxOccurrences || null,
+    repeatOccurrenceCount: 0,
     subtasks: (t.subtasks||[]).map(s=>({id:genId(), text:s.text, done:false})),
     createdAt: Date.now(), updatedAt: Date.now()
   };
