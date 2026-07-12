@@ -463,10 +463,6 @@ function load(){
       const d = JSON.parse(raw);
       projects = d.projects || defaultProjects();
       tasks = d.tasks || defaultTasks();
-      filterProjectId = d.filterProjectId ?? null;
-      filterStatus = normStatusFilter(d.filterStatus);
-      filterPriority = normPriorityFilter(d.filterPriority);
-      myDayFilter = d.myDayFilter ?? false;
       sortBy = d.sortBy || 'smart';
       if(d.theme){ currentTheme=d.theme; document.documentElement.setAttribute('data-theme',d.theme); localStorage.setItem(THEME_KEY,d.theme); }
     } else {
@@ -1160,10 +1156,6 @@ async function initFileSync(){
         const data = JSON.parse(await (await handle.getFile()).text());
         if(data.tasks && data.projects){
           projects = data.projects; tasks = data.tasks;
-          if(data.filterProjectId!==undefined) filterProjectId = data.filterProjectId;
-          if(data.filterStatus!==undefined) filterStatus = normStatusFilter(data.filterStatus);
-          if(data.filterPriority!==undefined) filterPriority = normPriorityFilter(data.filterPriority);
-          if(data.myDayFilter!==undefined) myDayFilter = data.myDayFilter;
           render();
         }
       }catch(_){ /* read failed — keep localStorage data */ }
