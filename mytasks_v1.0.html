@@ -213,6 +213,7 @@
     width: 100%; border: 0.5px solid var(--border); border-radius: var(--radius); padding: 8px 10px;
     font-size: 14px; background: var(--bg-2); color: var(--text); outline: none; font-family: var(--font);
   }
+  .field select { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--border-2); }
   .field textarea { resize: vertical; min-height: 64px; }
   .field-row { display: flex; gap: 10px; }
@@ -876,7 +877,7 @@ function renderDrawer(){
 
   overlay.classList.add('open'); drawer.classList.add('open');
 
-  const projOptions = projects.map(p=>`<option value="${p.id}" ${p.id===t.projectId?'selected':''}${p.name.length>20?` title="${esc(p.name)}"`:''}>${esc(abbreviateName(p.name))}</option>`).join('');
+  const projOptions = projects.map(p=>`<option value="${p.id}" ${p.id===t.projectId?'selected':''}${p.name.length>15?` title="${esc(p.name)}"`:''}>${esc(abbreviateName(p.name, 15))}</option>`).join('');
   const statusOptions = STATUSES.map(s=>`<option value="${s.id}" ${s.id===t.status?'selected':''}>${esc(s.label)}</option>`).join('');
   const priorityOptions = PRIORITIES.map(p=>`<option value="${p.id}" ${p.id===t.priority?'selected':''}>${esc(p.label)}</option>`).join('');
   const repeatOptions = REPEATS.map(r=>`<option value="${r.id}" ${r.id===(t.repeat||'none')?'selected':''}>${esc(r.label)}</option>`).join('');
