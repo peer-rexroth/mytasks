@@ -141,8 +141,10 @@
   .task-list-header, .task-row { grid-template-columns: 28px minmax(0,1fr) 170px 100px 120px 130px 76px; }
   .task-list-header { display: grid; column-gap: 10px; padding: 0 10px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); border-bottom: 0.5px solid var(--border); margin-bottom: 4px; position: sticky; top: 0; background: var(--bg-2); z-index: 5; }
 
-  .task-row { display: grid; grid-template-areas: "check title project priority status due del" ". sub sub sub sub sub ."; column-gap: 10px; row-gap: 6px; align-items: center; padding: 10px 10px; margin-bottom: 2px; border-radius: var(--radius); border: 0.5px solid transparent; cursor: pointer; }
+  .task-row { position: relative; display: grid; grid-template-areas: "check title project priority status due del" ". sub sub sub sub sub ."; column-gap: 10px; row-gap: 6px; align-items: center; padding: 10px 10px; margin-bottom: 2px; border-radius: var(--radius); border: 0.5px solid transparent; cursor: pointer; }
+  .task-row::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--project-color, transparent); }
   html[data-density="compact"] .task-row { padding: 3px 10px; row-gap: 2px; }
+  html[data-density="compact"] .task-row::before { top: 3px; bottom: 3px; }
   .task-row:hover { background: var(--bg); border-color: var(--border); }
   .task-row:hover .row-actions { opacity: 1; }
   .task-row.kbd-selected { background: var(--bg); border-color: var(--blue-border); box-shadow: 0 0 0 1px var(--blue-border); }
@@ -754,7 +756,7 @@ function renderList(){
     if(t.repeat && t.repeat!=='none'){
       dueCell += `<i class="fa-solid fa-repeat" style="color:var(--text-3);font-size:11px;margin-left:5px" title="Repeats ${repeatLabel(t.repeat)}"></i>`;
     }
-    return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''} ${selectedTaskIds.has(t.id)?'bulk-selected':''}" data-id="${t.id}" onclick="handleRowClick(event,'${t.id}')" ondblclick="openTask('${t.id}')">
+    return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''} ${selectedTaskIds.has(t.id)?'bulk-selected':''}" data-id="${t.id}" style="--project-color:${c.dot}" onclick="handleRowClick(event,'${t.id}')" ondblclick="openTask('${t.id}')">
       <div class="task-checkbox ${t.status==='done'?'checked':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <div class="task-main">
         ${renamingTaskId===t.id
