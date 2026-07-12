@@ -736,9 +736,11 @@ function renderList(){
   const list = getFilteredSortedTasks();
   const el = document.getElementById('taskList');
   if(list.length===0){
-    el.innerHTML = tasks.length===0
+    const html = tasks.length===0
       ? `<div class="empty-state"><i class="fa-solid fa-clipboard-check"></i><div>No tasks yet</div><button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="document.getElementById('quickAddInput').focus()">Add a task</button></div>`
       : `<div class="empty-state"><i class="fa-solid fa-clipboard-check"></i><div>No tasks match your filters.</div></div>`;
+    if(el.querySelector('.empty-state')) el.innerHTML = html;
+    else fadeSwapHTML(el, html);
     return;
   }
   el.innerHTML = list.map(t=>{
