@@ -271,6 +271,12 @@
   }
   [data-tooltip]:hover::after { opacity: 1; }
 
+  @keyframes rowIn { from{ opacity: 0; transform: translateY(-3px); } to{ opacity: 1; transform: translateY(0); } }
+  .task-row, .project-row { animation: rowIn .15s ease-out; }
+  .task-row.row-exit { animation: none; transition: opacity .15s ease-in, transform .15s ease-in; opacity: 0; transform: scale(.97) translateX(6px); pointer-events: none; }
+
+  mark.search-highlight { background: var(--amber-bg); color: var(--amber-text); border-radius: 3px; padding: 0 2px; font-weight: 600; }
+
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -587,6 +593,12 @@ function normFilterArr(v, allIds){ if(Array.isArray(v)) return v; if(v) return [
 function normStatusFilter(v){ return normFilterArr(v, STATUSES.map(s=>s.id)); }
 function normPriorityFilter(v){ return normFilterArr(v, PRIORITIES.map(p=>p.id)); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function highlightMatch(text, query){
+  if(!query) return esc(text);
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if(idx===-1) return esc(text);
+  return `${esc(text.slice(0,idx))}<mark class="search-highlight">${esc(text.slice(idx,idx+query.length))}</mark>${esc(text.slice(idx+query.length))}`;
+}
 function abbreviateName(name, maxLen=20){ return name.length > maxLen ? name.slice(0, maxLen) + '…' : name; }
 function projById(id){ return projects.find(p=>p.id===id); }
 function colorOf(name){ return CAT_COLORS.find(c=>c.name===name) || CAT_COLORS[0]; }
@@ -747,7 +759,7 @@ function renderList(){
       <div class="task-main">
         ${renamingTaskId===t.id
           ? `<input type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
-          : `<span class="task-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${esc(t.title)}</span>`}
+          : `<span class="task-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${highlightMatch(t.title, searchQuery)}</span>`}
       </div>
       <div class="task-cell"><span class="badge-project"${proj&&proj.name.length>20?` data-tooltip="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span></div>
       <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${t.priority}</span></div>
@@ -758,7 +770,7 @@ function renderList(){
           <div class="mini-check ${s.done?'checked':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
           ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
             ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputList" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
-            : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','list')">${esc(s.text)}</span>`}
+            : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','list')">${highlightMatch(s.text, searchQuery)}</span>`}
         </div>
       `).join('')}${inlineAddSubtaskTaskId===t.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
         <input type="text" id="inlineSubtaskInput" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')}">
@@ -1051,17 +1063,22 @@ function deleteTask(id){
     title: 'Delete task?',
     body: 'You can undo this from the toast right after deleting.',
     action: ()=>{
-      const idx = tasks.findIndex(t=>t.id===id);
-      if(idx===-1) return;
-      const [removed] = tasks.splice(idx,1);
-      if(activeTaskId===id) activeTaskId=null;
-      if(kbdSelectedTaskId===id) kbdSelectedTaskId=null;
-      save(); render();
-      showToast('Task deleted', false, ()=>{
-        tasks.splice(idx,0,removed);
+      const doDelete = ()=>{
+        const idx = tasks.findIndex(t=>t.id===id);
+        if(idx===-1) return;
+        const [removed] = tasks.splice(idx,1);
+        if(activeTaskId===id) activeTaskId=null;
+        if(kbdSelectedTaskId===id) kbdSelectedTaskId=null;
         save(); render();
-        showToast('Task restored');
-      });
+        showToast('Task deleted', false, ()=>{
+          tasks.splice(idx,0,removed);
+          save(); render();
+          showToast('Task restored');
+        });
+      };
+      const rowEl = document.querySelector(`.task-row[data-id="${id}"]`);
+      if(rowEl){ rowEl.classList.add('row-exit'); setTimeout(doDelete, 150); }
+      else doDelete();
     }
   });
 }
