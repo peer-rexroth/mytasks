@@ -1024,7 +1024,7 @@ function renderDrawer(){
       <div class="field">
         <label>On days</label>
         <div class="weekday-picker">
-          ${['S','M','T','W','T','F','S'].map((lbl,i)=>`<button type="button" class="weekday-btn ${(t.repeatWeekdays||[]).includes(i)?'active':''}" onclick="toggleRepeatWeekday('${t.id}',${i})">${lbl}</button>`).join('')}
+          ${[[1,'M'],[2,'T'],[3,'W'],[4,'T'],[5,'F'],[6,'S'],[0,'S']].map(([i,lbl])=>`<button type="button" class="weekday-btn ${(t.repeatWeekdays||[]).includes(i)?'active':''}" onclick="toggleRepeatWeekday('${t.id}',${i})">${lbl}</button>`).join('')}
         </div>
       </div>
       ` : ''}
