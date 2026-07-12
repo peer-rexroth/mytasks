@@ -283,6 +283,14 @@
         <span><i class="fa-solid fa-sun" style="width:14px;color:var(--text-3);margin-right:6px"></i>My Day</span>
         <span class="count" id="myDayCount"></span>
       </div>
+      <div class="nav-item" id="thisWeekNav" onclick="setThisWeekFilter()">
+        <span><i class="fa-solid fa-calendar-week" style="width:14px;color:var(--text-3);margin-right:6px"></i>This Week</span>
+        <span class="count" id="thisWeekCount"></span>
+      </div>
+      <div class="nav-item" id="overdueNav" onclick="setOverdueFilter()">
+        <span><i class="fa-solid fa-triangle-exclamation" style="width:14px;color:var(--red-text);margin-right:6px"></i>Overdue</span>
+        <span class="count" id="overdueCount"></span>
+      </div>
       <div class="nav-item" id="allTasksNav" onclick="setProjectFilter(null)">
         <span><i class="fa-solid fa-inbox" style="width:14px;color:var(--text-3);margin-right:6px"></i>All Tasks</span>
         <span class="count" id="allTasksCount"></span>
@@ -425,7 +433,7 @@ let activeTaskId = null;
 let kbdSelectedTaskId = null;
 let inlineAddSubtaskTaskId = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id);
-let myDayFilter = false;
+let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
 let modalTarget = null, pendingImportData = null;
@@ -487,7 +495,7 @@ function load(){
   }
 }
 function save(){
-  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, sortBy, theme: currentTheme };
+  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(fileHandle) fileSyncWrite(data).catch(()=>{});
 }
@@ -507,6 +515,13 @@ function fmtDate(iso){
   return new Date(y,m-1,d).toLocaleDateString(undefined,{month:'short',day:'numeric'});
 }
 function statusLabel(id){ return (STATUSES.find(s=>s.id===id)||{}).label || id; }
+function isOverdue(t){ return !!t.dueDate && t.dueDate < todayStr() && t.status!=='done'; }
+function isThisWeek(dueDate){
+  if(!dueDate) return false;
+  const today = todayStr();
+  const end = new Date(today+'T00:00:00'); end.setDate(end.getDate()+6);
+  return dueDate >= today && dueDate <= end.toISOString().slice(0,10);
+}
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function render(){
@@ -520,11 +535,17 @@ function taskCountsForProject(pid){
 }
 
 function renderSidebar(){
-  document.getElementById('allTasksNav').classList.toggle('active', !filterProjectId && !myDayFilter);
+  document.getElementById('allTasksNav').classList.toggle('active', !filterProjectId && !myDayFilter && !thisWeekFilter && !overdueFilter);
   document.getElementById('allTasksCount').textContent = tasks.filter(t=>t.status!=='done').length;
 
   document.getElementById('myDayNav').classList.toggle('active', myDayFilter);
   document.getElementById('myDayCount').textContent = tasks.filter(t=>t.dueDate===todayStr() && t.status!=='done').length;
+
+  document.getElementById('thisWeekNav').classList.toggle('active', thisWeekFilter);
+  document.getElementById('thisWeekCount').textContent = tasks.filter(t=>isThisWeek(t.dueDate) && t.status!=='done').length;
+
+  document.getElementById('overdueNav').classList.toggle('active', overdueFilter);
+  document.getElementById('overdueCount').textContent = tasks.filter(t=>isOverdue(t)).length;
 
   document.getElementById('statusChips').innerHTML = `
     <div class="f-chip ${filterStatus.length===STATUSES.length?'active':''}" onclick="setStatusFilter(null)">All</div>
@@ -556,7 +577,7 @@ function renderSidebar(){
   const total = tasks.length, done = tasks.filter(t=>t.status==='done').length;
   document.getElementById('sidebarFooter').textContent = `${total} task${total===1?'':'s'} · ${done} done`;
 
-  document.getElementById('mainTitle').textContent = myDayFilter ? 'My Day' : (filterProjectId ? (projById(filterProjectId)?.name || 'All Tasks') : 'All Tasks');
+  document.getElementById('mainTitle').textContent = myDayFilter ? 'My Day' : thisWeekFilter ? 'This Week' : overdueFilter ? 'Overdue' : (filterProjectId ? (projById(filterProjectId)?.name || 'All Tasks') : 'All Tasks');
   document.getElementById('sortSelect').value = sortBy;
 }
 
@@ -572,6 +593,8 @@ function getFilteredSortedTasks(){
   let list = tasks.filter(t=>{
     if(filterProjectId && t.projectId!==filterProjectId) return false;
     if(myDayFilter && t.dueDate!==todayStr()) return false;
+    if(thisWeekFilter && !isThisWeek(t.dueDate)) return false;
+    if(overdueFilter && !isOverdue(t)) return false;
     if(!filterStatus.includes(t.status)) return false;
     if(!filterPriority.includes(t.priority)) return false;
     if(searchQuery){
@@ -602,7 +625,7 @@ function renderList(){
     const subTotal = (t.subtasks||[]).length;
     let dueCell = '<span class="task-cell-empty">—</span>';
     if(t.dueDate){
-      const overdue = t.dueDate < todayStr() && t.status!=='done';
+      const overdue = isOverdue(t);
       const isToday = t.dueDate === todayStr();
       dueCell = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${overdue?'Overdue · ':''}${fmtDate(t.dueDate)}</span>`;
     }
@@ -842,8 +865,11 @@ function deleteProject(id){
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
-function setProjectFilter(id){ filterProjectId = id; myDayFilter = false; save(); render(); }
-function setMyDayFilter(){ myDayFilter = true; filterProjectId = null; save(); render(); }
+function clearSpecialViews(){ myDayFilter = false; thisWeekFilter = false; overdueFilter = false; }
+function setProjectFilter(id){ filterProjectId = id; clearSpecialViews(); save(); render(); }
+function setMyDayFilter(){ clearSpecialViews(); myDayFilter = true; filterProjectId = null; save(); render(); }
+function setThisWeekFilter(){ clearSpecialViews(); thisWeekFilter = true; filterProjectId = null; save(); render(); }
+function setOverdueFilter(){ clearSpecialViews(); overdueFilter = true; filterProjectId = null; save(); render(); }
 function setStatusFilter(s){
   if(s===null){
     filterStatus = filterStatus.length===STATUSES.length ? [] : STATUSES.map(x=>x.id);
@@ -905,6 +931,11 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){ closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renderList(); return; }
+  if(e.key==='/' && !isTypingTarget(document.activeElement) && !document.querySelector('.modal-bg.open')){
+    e.preventDefault();
+    document.getElementById('searchInput')?.focus();
+    return;
+  }
   handleListKeyNav(e);
 });
 function isTypingTarget(el){
@@ -1100,7 +1131,7 @@ async function createNewLinkedFile(){
     });
     fileHandle = handle;
     try{ await _fsPut(handle); }catch(_){}
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, sortBy, theme:currentTheme});
+    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not create file', true); }
@@ -1131,7 +1162,7 @@ async function linkFile(){
       }
       return;
     }
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, sortBy, theme:currentTheme});
+    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not link file', true); }
@@ -1152,6 +1183,8 @@ async function reconnectFile(){
       if(data.filterStatus!==undefined) filterStatus = normStatusFilter(data.filterStatus);
       if(data.filterPriority!==undefined) filterPriority = normPriorityFilter(data.filterPriority);
       if(data.myDayFilter!==undefined) myDayFilter = data.myDayFilter;
+      if(data.thisWeekFilter!==undefined) thisWeekFilter = data.thisWeekFilter;
+      if(data.overdueFilter!==undefined) overdueFilter = data.overdueFilter;
       render();
     }
     updateFileSyncUI();
