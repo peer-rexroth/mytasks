@@ -239,6 +239,7 @@
   .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; transform: translateY(80px); opacity: 0; transition: all 0.25s ease; z-index: 300; }
   .toast.show { transform: translateY(0); opacity: 1; }
   .toast.error { background: var(--red-text); }
+  .toast-undo { background: none; border: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; margin-left: 2px; }
 
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 5px; }
@@ -391,7 +392,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"><i class="fa-solid fa-check" id="toastIcon"></i><span id="toastMsg"></span></div>
+<div class="toast" id="toast"><i class="fa-solid fa-check" id="toastIcon"></i><span id="toastMsg"></span><button class="toast-undo" id="toastUndoBtn" style="display:none" onclick="triggerToastUndo()">Undo</button></div>
 
 <script>
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -742,12 +743,19 @@ function updateTaskFieldLive(id, field, value){
 function deleteTask(id){
   openConfirmModal({
     title: 'Delete task?',
-    body: 'This can\'t be undone.',
+    body: 'You can undo this from the toast right after deleting.',
     action: ()=>{
-      tasks = tasks.filter(t=>t.id!==id);
+      const idx = tasks.findIndex(t=>t.id===id);
+      if(idx===-1) return;
+      const [removed] = tasks.splice(idx,1);
       if(activeTaskId===id) activeTaskId=null;
+      if(kbdSelectedTaskId===id) kbdSelectedTaskId=null;
       save(); render();
-      showToast('Task deleted');
+      showToast('Task deleted', false, ()=>{
+        tasks.splice(idx,0,removed);
+        save(); render();
+        showToast('Task restored');
+      });
     }
   });
 }
@@ -769,9 +777,17 @@ function toggleSubtask(taskId, subId){
 }
 function deleteSubtask(taskId, subId){
   const t = tasks.find(x=>x.id===taskId); if(!t) return;
-  t.subtasks = t.subtasks.filter(x=>x.id!==subId);
+  const idx = t.subtasks.findIndex(x=>x.id===subId);
+  if(idx===-1) return;
+  const [removed] = t.subtasks.splice(idx,1);
   t.updatedAt = Date.now();
   save(); render();
+  showToast('Subtask deleted', false, ()=>{
+    const task = tasks.find(x=>x.id===taskId); if(!task) return;
+    task.subtasks.splice(idx,0,removed);
+    task.updatedAt = Date.now();
+    save(); render();
+  });
 }
 // ── Project CRUD ──────────────────────────────────────────────────────────────
 function openProjectModal(id){
@@ -806,13 +822,21 @@ function deleteProject(id){
   const p = projById(id); if(!p || p.locked) return;
   openConfirmModal({
     title: `Delete "${p.name}"?`,
-    body: 'Tasks in this project will be moved to Inbox. This can\'t be undone.',
+    body: 'Tasks in this project will be moved to Inbox. You can undo this from the toast right after deleting.',
     action: ()=>{
-      tasks.forEach(t=>{ if(t.projectId===id) t.projectId='proj-inbox'; });
-      projects = projects.filter(x=>x.id!==id);
+      const idx = projects.findIndex(x=>x.id===id);
+      if(idx===-1) return;
+      const [removed] = projects.splice(idx,1);
+      const movedTaskIds = [];
+      tasks.forEach(t=>{ if(t.projectId===id){ movedTaskIds.push(t.id); t.projectId='proj-inbox'; } });
       if(filterProjectId===id) filterProjectId=null;
       save(); render();
-      showToast('Project deleted');
+      showToast('Project deleted', false, ()=>{
+        projects.splice(idx,0,removed);
+        movedTaskIds.forEach(tid=>{ const t=tasks.find(x=>x.id===tid); if(t) t.projectId=id; });
+        save(); render();
+        showToast('Project restored');
+      });
     }
   });
 }
@@ -942,13 +966,23 @@ function toggleTheme(){
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
-function showToast(msg, isError=false){
+let toastUndoAction = null, toastHideTimer = null;
+function showToast(msg, isError=false, undoAction=null){
   const t = document.getElementById('toast');
   document.getElementById('toastMsg').textContent = msg;
   document.getElementById('toastIcon').className = isError ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-check';
   t.classList.toggle('error', isError);
+  toastUndoAction = undoAction;
+  document.getElementById('toastUndoBtn').style.display = undoAction ? 'inline' : 'none';
   t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2400);
+  clearTimeout(toastHideTimer);
+  toastHideTimer = setTimeout(()=>{ t.classList.remove('show'); toastUndoAction = null; }, undoAction ? 6000 : 2400);
+}
+function triggerToastUndo(){
+  if(toastUndoAction) toastUndoAction();
+  toastUndoAction = null;
+  clearTimeout(toastHideTimer);
+  document.getElementById('toast').classList.remove('show');
 }
 
 // ── Export / Import ───────────────────────────────────────────────────────────
