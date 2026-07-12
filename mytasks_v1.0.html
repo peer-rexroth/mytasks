@@ -167,6 +167,8 @@
   .task-subtask-row .mini-check i { font-size: 7px; color: #fff; opacity: 0; }
   .task-subtask-row .mini-check.checked i { opacity: 1; }
   .task-subtask-row.done { text-decoration: line-through; color: var(--text-3); }
+  .task-subtask-add-row { margin-top: 2px; }
+  .task-subtask-add-row input { width: 100%; border: 0.5px dashed var(--border-2); border-radius: var(--radius); padding: 4px 8px; font-size: 12.5px; background: transparent; color: var(--text); outline: none; font-family: var(--font); cursor: text; }
   .badge { font-size: 11px; padding: 2px 7px; border-radius: 20px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
   .badge-priority-high { background: var(--red-bg); color: var(--red-text); }
   .badge-priority-medium { background: var(--amber-bg); color: var(--amber-text); }
@@ -417,6 +419,7 @@ const PRIORITIES = [
 let projects = [], tasks = [];
 let activeTaskId = null;
 let kbdSelectedTaskId = null;
+let inlineAddSubtaskTaskId = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = null;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
@@ -602,12 +605,14 @@ function renderList(){
       <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${t.priority}</span></div>
       <div class="task-cell status"><span class="badge badge-status-${t.status}">${statusLabel(t.status)}</span></div>
       <div class="task-cell due">${dueCell}</div>
-      ${subTotal>0?`<div class="task-subtasks">${t.subtasks.map(s=>`
+      ${(subTotal>0||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks">${t.subtasks.map(s=>`
         <div class="task-subtask-row ${s.done?'done':''}">
           <div class="mini-check ${s.done?'checked':''}" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
           <span>${esc(s.text)}</span>
         </div>
-      `).join('')}</div>`:''}
+      `).join('')}${inlineAddSubtaskTaskId===t.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
+        <input type="text" id="inlineSubtaskInput" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')}">
+      </div>`:''}</div>`:''}
       <button class="icon-btn row-delete" onclick="event.stopPropagation();deleteTask('${t.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
     </div>`;
   }).join('');
@@ -858,7 +863,7 @@ document.addEventListener('click', e=>{
   if(!e.target.closest('#linkSplitBtn')) closeLinkMenu();
 });
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ closeAllModals(); closeDrawer(); return; }
+  if(e.key==='Escape'){ closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renderList(); return; }
   handleListKeyNav(e);
 });
 function isTypingTarget(el){
@@ -866,13 +871,32 @@ function isTypingTarget(el){
   const tag = el.tagName;
   return tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || el.isContentEditable;
 }
+function addInlineSubtask(taskId){
+  const input = document.getElementById('inlineSubtaskInput');
+  if(!input) return;
+  const text = input.value.trim();
+  if(!text) return;
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  t.subtasks.push({id:genId(), text, done:false});
+  t.updatedAt = Date.now();
+  save(); render();
+  document.getElementById('inlineSubtaskInput')?.focus();
+}
 function handleListKeyNav(e){
-  if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter') return;
+  if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter' && e.key!=='Tab') return;
   if(isTypingTarget(document.activeElement)) return;
   if(document.querySelector('.modal-bg.open')) return;
   if(activeTaskId) return;
   const list = getFilteredSortedTasks();
   if(!list.length) return;
+  if(e.key==='Tab'){
+    if(!kbdSelectedTaskId || !list.some(t=>t.id===kbdSelectedTaskId)) return;
+    e.preventDefault();
+    inlineAddSubtaskTaskId = kbdSelectedTaskId;
+    renderList();
+    document.getElementById('inlineSubtaskInput')?.focus();
+    return;
+  }
   if(e.key==='Enter'){
     if(kbdSelectedTaskId && list.some(t=>t.id===kbdSelectedTaskId)){
       e.preventDefault();
@@ -881,6 +905,7 @@ function handleListKeyNav(e){
     return;
   }
   e.preventDefault();
+  inlineAddSubtaskTaskId = null;
   const idx = list.findIndex(t=>t.id===kbdSelectedTaskId);
   let next;
   if(idx===-1) next = 0;
