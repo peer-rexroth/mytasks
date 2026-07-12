@@ -414,7 +414,7 @@ const PRIORITIES = [
 // ── State ─────────────────────────────────────────────────────────────────────
 let projects = [], tasks = [];
 let activeTaskId = null;
-let filterProjectId = null, filterStatus = null, filterPriority = null;
+let filterProjectId = null, filterStatus = [], filterPriority = null;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
 let modalTarget = null, pendingImportData = null;
@@ -454,7 +454,7 @@ function load(){
       projects = d.projects || defaultProjects();
       tasks = d.tasks || defaultTasks();
       filterProjectId = d.filterProjectId ?? null;
-      filterStatus = d.filterStatus ?? null;
+      filterStatus = normStatusFilter(d.filterStatus);
       filterPriority = d.filterPriority ?? null;
       sortBy = d.sortBy || 'smart';
       if(d.theme){ currentTheme=d.theme; document.documentElement.setAttribute('data-theme',d.theme); localStorage.setItem(THEME_KEY,d.theme); }
@@ -486,6 +486,7 @@ function save(){
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function normStatusFilter(v){ if(Array.isArray(v)) return v; if(v) return [v]; return []; }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function projById(id){ return projects.find(p=>p.id===id); }
 function colorOf(name){ return CAT_COLORS.find(c=>c.name===name) || CAT_COLORS[0]; }
@@ -513,7 +514,7 @@ function renderSidebar(){
   document.getElementById('allTasksCount').textContent = tasks.filter(t=>t.status!=='done').length;
 
   document.getElementById('statusChips').innerHTML = STATUSES.map(s=>`
-    <div class="f-chip ${filterStatus===s.id?'active':''}" onclick="setStatusFilter('${s.id}')">${esc(s.label)}</div>
+    <div class="f-chip ${filterStatus.includes(s.id)?'active':''}" onclick="setStatusFilter('${s.id}')">${esc(s.label)}</div>
   `).join('');
 
   document.getElementById('priorityChips').innerHTML = PRIORITIES.map(p=>`
@@ -553,7 +554,7 @@ const sortComparators = {
 function getFilteredSortedTasks(){
   let list = tasks.filter(t=>{
     if(filterProjectId && t.projectId!==filterProjectId) return false;
-    if(filterStatus && t.status!==filterStatus) return false;
+    if(filterStatus.length && !filterStatus.includes(t.status)) return false;
     if(filterPriority && t.priority!==filterPriority) return false;
     if(searchQuery){
       const q = searchQuery.toLowerCase();
@@ -798,7 +799,7 @@ function deleteProject(id){
 
 // ── Filters ───────────────────────────────────────────────────────────────────
 function setProjectFilter(id){ filterProjectId = id; save(); render(); }
-function setStatusFilter(s){ filterStatus = (filterStatus===s) ? null : s; save(); render(); }
+function setStatusFilter(s){ filterStatus = filterStatus.includes(s) ? filterStatus.filter(x=>x!==s) : [...filterStatus, s]; save(); render(); }
 function setPriorityFilter(p){ filterPriority = (filterPriority===p) ? null : p; save(); render(); }
 function setSortBy(v){ sortBy = v; save(); renderList(); }
 function setSearchQuery(v){ searchQuery = v; renderList(); }
@@ -1029,7 +1030,7 @@ async function reconnectFile(){
     if(data.tasks && data.projects){
       projects = data.projects; tasks = data.tasks;
       if(data.filterProjectId!==undefined) filterProjectId = data.filterProjectId;
-      if(data.filterStatus!==undefined) filterStatus = data.filterStatus;
+      if(data.filterStatus!==undefined) filterStatus = normStatusFilter(data.filterStatus);
       if(data.filterPriority!==undefined) filterPriority = data.filterPriority;
       render();
     }
@@ -1070,7 +1071,7 @@ async function initFileSync(){
         if(data.tasks && data.projects){
           projects = data.projects; tasks = data.tasks;
           if(data.filterProjectId!==undefined) filterProjectId = data.filterProjectId;
-          if(data.filterStatus!==undefined) filterStatus = data.filterStatus;
+          if(data.filterStatus!==undefined) filterStatus = normStatusFilter(data.filterStatus);
           if(data.filterPriority!==undefined) filterPriority = data.filterPriority;
           render();
         }
