@@ -653,6 +653,7 @@ function fmtDate(iso){
   return new Date(y,m-1,d).toLocaleDateString(undefined,{month:'short',day:'numeric'});
 }
 function statusLabel(id){ return (STATUSES.find(s=>s.id===id)||{}).label || id; }
+function priorityLabel(id){ return (PRIORITIES.find(p=>p.id===id)||{}).label || id; }
 function repeatLabel(id){ return (REPEATS.find(r=>r.id===id)||{}).label || id; }
 function repeatSummary(t){
   if(!t.repeat || t.repeat==='none') return '';
@@ -868,7 +869,7 @@ function renderList(){
         ${(t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; return `<span class="badge badge-tag"><i class="fa-solid ${tg.icon}"></i>${esc(tg.label)}</span>`; }).join('')}
       </div>
       <div class="task-cell"><span class="badge-project"${proj&&proj.name.length>20?` data-tooltip="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span></div>
-      <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${t.priority}</span></div>
+      <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${priorityLabel(t.priority)}</span></div>
       <div class="task-cell status"><span class="badge badge-status-${t.status}">${statusLabel(t.status)}</span></div>
       <div class="task-cell due">${dueCell}</div>
       ${(subTotal>0||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks">${t.subtasks.map(s=>`
