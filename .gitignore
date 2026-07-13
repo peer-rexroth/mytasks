@@ -1,3 +1,4 @@
 .claude/
 .mytasks-server.pid
 .mytasks-server.log
+.DS_Store

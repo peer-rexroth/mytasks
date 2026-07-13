@@ -1,6 +1,7 @@
 #!/bin/bash
 # Launches mytasks on a local server (needed for PWA install/offline support,
-# which browsers refuse to enable for file:// pages) and opens it in Chrome.
+# which browsers refuse to enable for file:// pages) and opens it in Chrome or
+# Edge — Safari doesn't support installing this kind of PWA on macOS.
 set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,4 +31,12 @@ if ! is_up; then
   fi
 fi
 
-open "$URL"
+if [ -d "/Applications/Google Chrome.app" ]; then
+  open -a "Google Chrome" "$URL"
+elif [ -d "/Applications/Microsoft Edge.app" ]; then
+  open -a "Microsoft Edge" "$URL"
+else
+  echo "Neither Chrome nor Edge found in /Applications — opening your default browser instead."
+  echo "Install/offline support needs Chrome or Edge; Safari doesn't support it for this kind of app."
+  open "$URL"
+fi
