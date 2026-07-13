@@ -1425,7 +1425,9 @@ function updateTaskFieldLive(id, field, value){
   const t = tasks.find(x=>x.id===id); if(!t) return;
   t[field] = value;
   t.updatedAt = Date.now();
-  save(); renderList(); renderSidebar();
+  save();
+  if(viewMode==='board'){ renderBoard(); } else { renderList(); }
+  renderSidebar();
 }
 
 function deleteTask(id){
