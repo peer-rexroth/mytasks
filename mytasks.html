@@ -565,7 +565,7 @@ let lastClickedTaskId = null;
 let inlineAddSubtaskTaskId = null;
 let justCompletedTaskId = null;
 let justCompletedSubId = null;
-let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id), filterTags = TAGS.map(t=>t.id);
+let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id), filterTags = [];
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
@@ -671,7 +671,7 @@ function genId(){ return Date.now().toString(36)+Math.random().toString(36).slic
 function normFilterArr(v, allIds){ if(Array.isArray(v)) return v; if(v) return [v]; return allIds; }
 function normStatusFilter(v){ return normFilterArr(v, STATUSES.map(s=>s.id)); }
 function normPriorityFilter(v){ return normFilterArr(v, PRIORITIES.map(p=>p.id)); }
-function normTagFilter(v){ return normFilterArr(v, TAGS.map(t=>t.id)); }
+function normTagFilter(v){ return Array.isArray(v) ? v.filter(id=>TAGS.some(t=>t.id===id)) : []; }
 function tagById(id){ return TAGS.find(t=>t.id===id); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function highlightMatch(text, query){
@@ -820,9 +820,7 @@ function renderSidebar(){
     return `<div class="f-chip ${active?'active':''}" style="${active?`background:${p.bg};color:${p.text};border-color:${p.text}`:''}" role="button" tabindex="0" aria-pressed="${active}" onclick="setPriorityFilter('${p.id}')">${esc(p.label)}</div>`;
   }).join('');
 
-  document.getElementById('tagChips').innerHTML = `
-    <div class="f-chip ${filterTags.length===TAGS.length?'active':''}" role="button" tabindex="0" aria-pressed="${filterTags.length===TAGS.length}" onclick="setTagFilter(null)">All</div>
-  ` + TAGS.map(tg=>{
+  document.getElementById('tagChips').innerHTML = TAGS.map(tg=>{
     const active = filterTags.includes(tg.id);
     return `<div class="f-chip ${active?'active':''}" role="button" tabindex="0" aria-pressed="${active}" onclick="setTagFilter('${tg.id}')">${esc(tg.label)}</div>`;
   }).join('');
@@ -864,7 +862,7 @@ function taskMatchesFilters(t, opts){
   if(overdueFilter && !isOverdue(t)) return false;
   if(!opts.ignoreStatus && !filterStatus.includes(t.status)) return false;
   if(!filterPriority.includes(t.priority)) return false;
-  if(filterTags.length<TAGS.length){
+  if(filterTags.length>0){
     if(!(t.tags||[]).some(tg=>filterTags.includes(tg))) return false;
   }
   if(searchQuery){
@@ -1679,10 +1677,6 @@ function setPriorityFilter(p){
   save(); render();
 }
 function setTagFilter(tg){
-  if(tg===null){
-    filterTags = filterTags.length===TAGS.length ? [] : TAGS.map(x=>x.id);
-    save(); render(); return;
-  }
   filterTags = filterTags.includes(tg) ? filterTags.filter(x=>x!==tg) : [...filterTags, tg];
   save(); render();
 }
