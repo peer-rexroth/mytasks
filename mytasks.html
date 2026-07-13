@@ -198,7 +198,6 @@
   .badge-priority-medium { background: var(--amber-bg); color: var(--amber-text); }
   .badge-priority-low { background: var(--teal-bg); color: var(--teal-text); }
   .badge-tag { background: var(--bg-3); color: var(--text-2); font-size: 10.5px; }
-  .badge-tag i { font-size: 9px; margin-right: 3px; }
   .badge-due { background: var(--bg-3); color: var(--text-2); }
   .badge-due.overdue { background: var(--red-bg); color: var(--red-text); }
   .badge-due.today { background: var(--amber-bg); color: var(--amber-text); }
@@ -517,9 +516,9 @@ const REPEATS = [
 ];
 // Fixed context tags — intentionally not user-editable (no add/rename/delete UI).
 const TAGS = [
-  {id:'waiting-on',  label:'Waiting on',  icon:'fa-hourglass-half'},
-  {id:'deep-work',   label:'Deep work',   icon:'fa-brain'},
-  {id:'someday',     label:'Someday',     icon:'fa-cloud'}
+  {id:'waiting-on',  label:'waiting on'},
+  {id:'deep-work',   label:'deep work'},
+  {id:'someday',     label:'someday'}
 ];
 const COMPLETED_RETENTION_DAYS = 90;
 
@@ -777,7 +776,7 @@ function renderSidebar(){
     <div class="f-chip ${filterTags.length===TAGS.length?'active':''}" role="button" tabindex="0" aria-pressed="${filterTags.length===TAGS.length}" onclick="setTagFilter(null)">All</div>
   ` + TAGS.map(tg=>{
     const active = filterTags.includes(tg.id);
-    return `<div class="f-chip ${active?'active':''}" role="button" tabindex="0" aria-pressed="${active}" onclick="setTagFilter('${tg.id}')"><i class="fa-solid ${tg.icon}" style="font-size:10px"></i> ${esc(tg.label)}</div>`;
+    return `<div class="f-chip ${active?'active':''}" role="button" tabindex="0" aria-pressed="${active}" onclick="setTagFilter('${tg.id}')">${esc(tg.label)}</div>`;
   }).join('');
 
   document.getElementById('projectList').innerHTML = projects.map(p=>{
@@ -866,7 +865,7 @@ function renderList(){
         ${renamingTaskId===t.id
           ? `<input type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
           : `<span class="task-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${highlightMatch(t.title, searchQuery)}</span>`}
-        ${(t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; return `<span class="badge badge-tag"><i class="fa-solid ${tg.icon}"></i>${esc(tg.label)}</span>`; }).join('')}
+        ${(t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; return `<span class="badge badge-tag">${esc(tg.label)}</span>`; }).join('')}
       </div>
       <div class="task-cell"><span class="badge-project"${proj&&proj.name.length>20?` data-tooltip="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span></div>
       <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${priorityLabel(t.priority)}</span></div>
@@ -1083,7 +1082,7 @@ function renderDrawer(){
       <div class="field">
         <label>Tags</label>
         <div class="filter-chips">
-          ${TAGS.map(tg=>{ const active=(t.tags||[]).includes(tg.id); return `<div class="f-chip ${active?'active':''}" role="button" tabindex="0" aria-pressed="${active}" onclick="toggleTaskTag('${t.id}','${tg.id}')"><i class="fa-solid ${tg.icon}" style="font-size:10px"></i> ${esc(tg.label)}</div>`; }).join('')}
+          ${TAGS.map(tg=>{ const active=(t.tags||[]).includes(tg.id); return `<div class="f-chip ${active?'active':''}" role="button" tabindex="0" aria-pressed="${active}" onclick="toggleTaskTag('${t.id}','${tg.id}')">${esc(tg.label)}</div>`; }).join('')}
         </div>
       </div>
       <div class="field-row">
