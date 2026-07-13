@@ -156,6 +156,7 @@
   .board-card { background: var(--bg-2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 9px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 7px; }
   .board-card:hover { border-color: var(--border-2); }
   .board-card.dragging { opacity: .4; }
+  .board-card.kbd-selected { border-color: var(--blue-border); box-shadow: 0 0 0 1px var(--blue-border); }
   .board-card-top { display: flex; align-items: flex-start; gap: 8px; }
   .board-card-title { font-size: 13px; font-weight: 500; flex: 1; word-break: break-word; }
   .board-card.done .board-card-title { text-decoration: line-through; color: var(--text-3); }
@@ -950,9 +951,9 @@ function boardCardHtml(t){
     dueBadge = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${fmtDate(t.dueDate)}</span>`;
   }
   const tagBadges = (t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; return `<span class="badge badge-tag">${esc(tg.label)}</span>`; }).join('');
-  return `<div class="board-card ${t.status==='done'?'done':''}" data-id="${t.id}" draggable="true"
+  return `<div class="board-card ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''}" data-id="${t.id}" draggable="true"
       ondragstart="handleCardDragStart(event,'${t.id}')" ondragend="handleCardDragEnd(event)"
-      ondblclick="openTask('${t.id}')">
+      onclick="selectBoardCard('${t.id}')" ondblclick="openTask('${t.id}')">
     <div class="board-card-top">
       <div class="task-checkbox ${t.status==='done'?'checked':''} ${t.id===justCompletedTaskId?'pop':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       ${renamingTaskId===t.id
@@ -975,13 +976,17 @@ function boardCardHtml(t){
     ${tagBadges?`<div class="board-card-tags">${tagBadges}</div>`:''}
   </div>`;
 }
+function getBoardColumns(){
+  const filtered = tasks.filter(t=>taskMatchesFilters(t, {ignoreStatus:true}));
+  const cmp = sortComparators[sortBy] || sortComparators.smart;
+  return STATUSES.map(st=>({ status: st, tasks: filtered.filter(t=>t.status===st.id).sort(cmp) }));
+}
 function renderBoard(){
   const board = document.getElementById('board');
   if(!board) return;
-  const filtered = tasks.filter(t=>taskMatchesFilters(t, {ignoreStatus:true}));
-  const cmp = sortComparators[sortBy] || sortComparators.smart;
-  board.innerHTML = STATUSES.map(st=>{
-    const colTasks = filtered.filter(t=>t.status===st.id).sort(cmp);
+  const columns = getBoardColumns();
+  board.innerHTML = columns.map(col=>{
+    const st = col.status, colTasks = col.tasks;
     return `<div class="board-col" data-status="${st.id}" ondragover="handleBoardDragOver(event,'${st.id}')" ondragleave="handleBoardDragLeave(event)" ondrop="handleBoardDrop(event,'${st.id}')">
       <div class="board-col-header"><span>${esc(st.label)}</span><span class="count">${colTasks.length}</span></div>
       <div class="board-col-body">
@@ -1015,6 +1020,62 @@ function handleBoardDrop(e, statusId){
   const t = tasks.find(x=>x.id===id);
   if(!t || t.status===statusId) return;
   updateTaskField(id, 'status', statusId);
+}
+function selectBoardCard(id){
+  const prevId = kbdSelectedTaskId;
+  kbdSelectedTaskId = id;
+  if(prevId){ document.querySelector(`.board-card[data-id="${prevId}"]`)?.classList.remove('kbd-selected'); }
+  document.querySelector(`.board-card[data-id="${kbdSelectedTaskId}"]`)?.classList.add('kbd-selected');
+}
+function handleBoardKeyNav(e){
+  if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='ArrowLeft' && e.key!=='ArrowRight' && e.key!=='Enter' && e.key!==' ') return;
+  if(isTypingTarget(document.activeElement)) return;
+  if(document.querySelector('.modal-bg.open')) return;
+  if(activeTaskId) return;
+
+  const columns = getBoardColumns();
+  let colIdx=-1, rowIdx=-1;
+  for(let i=0;i<columns.length;i++){
+    const idx = columns[i].tasks.findIndex(t=>t.id===kbdSelectedTaskId);
+    if(idx!==-1){ colIdx=i; rowIdx=idx; break; }
+  }
+
+  if(e.key==='Enter' || e.key===' '){
+    if(colIdx!==-1){
+      e.preventDefault();
+      openTask(columns[colIdx].tasks[rowIdx].id);
+    }
+    return;
+  }
+
+  e.preventDefault();
+  if(colIdx===-1){
+    colIdx = columns.findIndex(c=>c.tasks.length>0);
+    if(colIdx===-1) return;
+    rowIdx = 0;
+  } else if(e.key==='ArrowDown'){
+    rowIdx = Math.min(rowIdx+1, columns[colIdx].tasks.length-1);
+  } else if(e.key==='ArrowUp'){
+    rowIdx = Math.max(rowIdx-1, 0);
+  } else if(e.key==='ArrowLeft' || e.key==='ArrowRight'){
+    const dir = e.key==='ArrowRight' ? 1 : -1;
+    let nextCol = colIdx;
+    for(let step=1; step<=columns.length; step++){
+      const cand = colIdx + dir*step;
+      if(cand<0 || cand>=columns.length) break;
+      if(columns[cand].tasks.length>0){ nextCol = cand; break; }
+    }
+    if(nextCol===colIdx) return;
+    colIdx = nextCol;
+    rowIdx = Math.min(rowIdx, columns[colIdx].tasks.length-1);
+  }
+
+  const prevId = kbdSelectedTaskId;
+  kbdSelectedTaskId = columns[colIdx].tasks[rowIdx].id;
+  if(prevId){ document.querySelector(`.board-card[data-id="${prevId}"]`)?.classList.remove('kbd-selected'); }
+  const el = document.querySelector(`.board-card[data-id="${kbdSelectedTaskId}"]`);
+  el?.classList.add('kbd-selected');
+  el?.scrollIntoView({block:'nearest'});
 }
 function setViewMode(mode){
   if(mode===viewMode || (mode!=='board' && mode!=='list')) return;
@@ -1737,7 +1798,9 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
-    closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renamingTaskId=null; renamingSubtask=null; selectedTaskIds.clear(); renderList(); renderBulkBar();
+    closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renamingTaskId=null; renamingSubtask=null; selectedTaskIds.clear();
+    if(viewMode==='board'){ renderBoard(); } else { renderList(); }
+    renderBulkBar();
     const el = document.activeElement;
     if(el && (el.id==='quickAddInput' || el.id==='searchInput')) el.blur();
     return;
@@ -1777,7 +1840,7 @@ document.addEventListener('keydown', e=>{
     document.getElementById('quickAddInput')?.focus();
     return;
   }
-  handleListKeyNav(e);
+  if(viewMode==='board'){ handleBoardKeyNav(e); } else { handleListKeyNav(e); }
 });
 function isTypingTarget(el){
   if(!el) return false;
@@ -1796,7 +1859,6 @@ function addInlineSubtask(taskId){
   document.getElementById('inlineSubtaskInput')?.focus();
 }
 function handleListKeyNav(e){
-  if(viewMode==='board') return;
   if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter' && e.key!==' ' && e.key!=='Tab' && e.key!=='Delete') return;
   if(isTypingTarget(document.activeElement)) return;
   if(document.querySelector('.modal-bg.open')) return;
