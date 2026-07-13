@@ -506,6 +506,7 @@ const REPEATS = [
   {id:'monthly', label:'Monthly'},
   {id:'yearly',  label:'Yearly'}
 ];
+const COMPLETED_RETENTION_DAYS = 90;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let projects = [], tasks = [];
@@ -574,6 +575,7 @@ function load(){
       if(!t.subtasks) t.subtasks=[];
       if(!t.priority) t.priority='medium';
       if(!t.status) t.status='todo';
+      if(t.completedAt===undefined) t.completedAt = (t.status==='done' && t.updatedAt) ? t.updatedAt : null;
       if(!t.repeat) t.repeat='none';
       if(!t.repeatInterval) t.repeatInterval=1;
       if(!t.repeatWeekdays) t.repeatWeekdays=[];
@@ -596,6 +598,18 @@ function save(){
   const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, compactMode };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(fileHandle) fileSyncWrite(data).catch(()=>{});
+}
+// housekeeping: silently drop tasks that have sat completed for longer than the retention window
+function purgeOldCompletedTasks(){
+  const cutoff = Date.now() - COMPLETED_RETENTION_DAYS*24*60*60*1000;
+  const before = tasks.length;
+  tasks = tasks.filter(t=>!(t.status==='done' && t.completedAt && t.completedAt < cutoff));
+  const removed = before - tasks.length;
+  if(removed>0){
+    save();
+    showToast(`Cleaned up ${removed} task${removed===1?'':'s'} completed over ${COMPLETED_RETENTION_DAYS} days ago`);
+  }
+  return removed;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -901,11 +915,11 @@ function renderBulkBar(){
 }
 function bulkSetStatus(status){
   const ids = [...selectedTaskIds];
-  const prev = ids.map(id=>{ const t=tasks.find(x=>x.id===id); return t?{id, status:t.status}:null; }).filter(Boolean);
-  ids.forEach(id=>{ const t=tasks.find(x=>x.id===id); if(t){ t.status=status; t.updatedAt=Date.now(); } });
+  const prev = ids.map(id=>{ const t=tasks.find(x=>x.id===id); return t?{id, status:t.status, completedAt:t.completedAt}:null; }).filter(Boolean);
+  ids.forEach(id=>{ const t=tasks.find(x=>x.id===id); if(t){ t.status=status; t.completedAt = status==='done' ? Date.now() : null; t.updatedAt=Date.now(); } });
   save(); render();
   showToast(`Status updated for ${ids.length} task${ids.length===1?'':'s'}`, false, ()=>{
-    prev.forEach(p=>{ const t=tasks.find(x=>x.id===p.id); if(t){ t.status=p.status; t.updatedAt=Date.now(); } });
+    prev.forEach(p=>{ const t=tasks.find(x=>x.id===p.id); if(t){ t.status=p.status; t.completedAt=p.completedAt; t.updatedAt=Date.now(); } });
     save(); render();
   });
 }
@@ -1133,9 +1147,10 @@ function toggleTaskDone(id){
   const t = tasks.find(x=>x.id===id); if(!t) return;
   if(t.status!=='done' && t.repeat && t.repeat!=='none'){
     const prevStatus = t.status;
+    const prevCompletedAt = t.completedAt;
     const result = advanceRecurring(id);
     if(!result) return;
-    if(result.ended) t.status = 'done';
+    if(result.ended){ t.status = 'done'; t.completedAt = Date.now(); }
     t.updatedAt = Date.now();
     save(); render();
     const msg = result.ended ? 'Recurring series completed' : `Recurring task rescheduled to ${fmtDate(result.nextDate)}`;
@@ -1143,12 +1158,15 @@ function toggleTaskDone(id){
       const task = tasks.find(x=>x.id===id); if(!task) return;
       result.undo();
       task.status = prevStatus;
+      task.completedAt = prevCompletedAt;
       task.updatedAt = Date.now();
       save(); render();
     });
     return;
   }
-  t.status = t.status==='done' ? 'todo' : 'done';
+  const goingDone = t.status!=='done';
+  t.status = goingDone ? 'done' : 'todo';
+  t.completedAt = goingDone ? Date.now() : null;
   t.updatedAt = Date.now();
   save(); render();
 }
@@ -1161,9 +1179,13 @@ function updateTaskField(id, field, value){
   }
   const prevValue = t[field];
   const prevDueDate = t.dueDate;
+  const prevCompletedAt = t.completedAt;
   t[field] = value;
   if(field==='repeat' && value!=='none' && !t.dueDate){
     t.dueDate = todayStr();
+  }
+  if(field==='status'){
+    t.completedAt = value==='done' ? Date.now() : null;
   }
   t.updatedAt = Date.now();
   save(); render();
@@ -1171,6 +1193,7 @@ function updateTaskField(id, field, value){
     const task = tasks.find(x=>x.id===id); if(!task) return;
     task[field] = prevValue;
     task.dueDate = prevDueDate;
+    task.completedAt = prevCompletedAt;
     task.updatedAt = Date.now();
     save(); render();
   });
@@ -1227,6 +1250,7 @@ function duplicateTask(id){
     notes: t.notes || '',
     projectId: t.projectId,
     status: 'todo',
+    completedAt: null,
     priority: t.priority,
     dueDate: null,
     repeat: t.repeat || 'none',
@@ -1818,6 +1842,7 @@ async function reconnectFile(){
       if(data.thisWeekFilter!==undefined) thisWeekFilter = data.thisWeekFilter;
       if(data.overdueFilter!==undefined) overdueFilter = data.overdueFilter;
       lastSyncedSnapshot = text;
+      purgeOldCompletedTasks();
       render();
     }
     updateFileSyncUI();
@@ -1868,6 +1893,7 @@ async function initFileSync(){
         if(data.tasks && data.projects){
           projects = data.projects; tasks = data.tasks;
           lastSyncedSnapshot = text;
+          purgeOldCompletedTasks();
           render();
         }
       }catch(_){ /* read failed — keep localStorage data */ }
@@ -1885,6 +1911,7 @@ async function initFileSync(){
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 load();
+purgeOldCompletedTasks();
 updateCompactIcon();
 render();
 initFileSync();
