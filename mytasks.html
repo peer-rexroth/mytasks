@@ -160,6 +160,7 @@
   .board-card-title { font-size: 13px; font-weight: 500; flex: 1; word-break: break-word; }
   .board-card.done .board-card-title { text-decoration: line-through; color: var(--text-3); }
   .board-card-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .board-card-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
 
   .quickadd { display: flex; align-items: center; gap: 8px; margin: 12px 20px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 2px; }
   .quickadd i { color: var(--text-3); margin-left: 10px; font-size: 13px; }
@@ -960,8 +961,8 @@ function boardCardHtml(t){
       <span class="badge-project"${proj&&proj.name.length>20?` data-tooltip="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span>
       <span class="badge badge-priority-${t.priority}">${priorityLabel(t.priority)}</span>
       ${dueBadge}
-      ${tagBadges}
     </div>
+    ${tagBadges?`<div class="board-card-tags">${tagBadges}</div>`:''}
     ${(t.subtasks||[]).length>0?`<div class="task-subtasks" style="margin-left:2px">${t.subtasks.map(s=>`
       <div class="task-subtask-row ${s.done?'done':''}">
         <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
