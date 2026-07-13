@@ -952,15 +952,19 @@ function boardCardHtml(t){
   const tagBadges = (t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; return `<span class="badge badge-tag">${esc(tg.label)}</span>`; }).join('');
   return `<div class="board-card ${t.status==='done'?'done':''}" data-id="${t.id}" draggable="true"
       ondragstart="handleCardDragStart(event,'${t.id}')" ondragend="handleCardDragEnd(event)"
-      onclick="openTask('${t.id}')">
+      ondblclick="openTask('${t.id}')">
     <div class="board-card-top">
       <div class="task-checkbox ${t.status==='done'?'checked':''} ${t.id===justCompletedTaskId?'pop':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
-      <div class="board-card-title">${highlightMatch(t.title, searchQuery)}</div>
+      ${renamingTaskId===t.id
+        ? `<input type="text" class="task-title-input" id="renameTaskInputBoard" style="flex:1" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
+        : `<div class="board-card-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${highlightMatch(t.title, searchQuery)}</div>`}
     </div>
     ${(t.subtasks||[]).length>0?`<div class="task-subtasks" style="margin-left:2px">${t.subtasks.map(s=>`
       <div class="task-subtask-row ${s.done?'done':''}">
         <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
-        <span onclick="event.stopPropagation()">${highlightMatch(s.text, searchQuery)}</span>
+        ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
+          ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputBoard" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
+          : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','board')">${highlightMatch(s.text, searchQuery)}</span>`}
       </div>
     `).join('')}</div>`:''}
     <div class="board-card-meta">
@@ -1485,8 +1489,8 @@ function duplicateTask(id){
 
 function startRenameTask(id){
   renamingTaskId = id;
-  renderList();
-  const input = document.getElementById('renameTaskInput');
+  if(viewMode==='board'){ renderBoard(); } else { renderList(); }
+  const input = document.getElementById(viewMode==='board' ? 'renameTaskInputBoard' : 'renameTaskInput');
   if(input){ input.focus(); input.select(); }
 }
 function commitRenameTask(id, value){
@@ -1499,7 +1503,7 @@ function commitRenameTask(id, value){
 }
 function cancelRenameTask(){
   renamingTaskId = null;
-  renderList();
+  if(viewMode==='board'){ renderBoard(); } else { renderList(); }
 }
 
 function startRenameSubtask(taskId, subId, context){
@@ -1507,6 +1511,10 @@ function startRenameSubtask(taskId, subId, context){
   if(context==='drawer'){
     renderDrawer();
     const input = document.getElementById('renameSubtaskInputDrawer');
+    if(input){ input.focus(); input.select(); }
+  } else if(context==='board'){
+    renderBoard();
+    const input = document.getElementById('renameSubtaskInputBoard');
     if(input){ input.focus(); input.select(); }
   } else {
     renderList();
@@ -1788,6 +1796,7 @@ function addInlineSubtask(taskId){
   document.getElementById('inlineSubtaskInput')?.focus();
 }
 function handleListKeyNav(e){
+  if(viewMode==='board') return;
   if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter' && e.key!==' ' && e.key!=='Tab' && e.key!=='Delete') return;
   if(isTypingTarget(document.activeElement)) return;
   if(document.querySelector('.modal-bg.open')) return;
