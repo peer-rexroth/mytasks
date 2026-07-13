@@ -197,6 +197,8 @@
   .badge-priority-high { background: var(--red-bg); color: var(--red-text); }
   .badge-priority-medium { background: var(--amber-bg); color: var(--amber-text); }
   .badge-priority-low { background: var(--teal-bg); color: var(--teal-text); }
+  .badge-tag { background: var(--bg-3); color: var(--text-2); font-size: 10.5px; }
+  .badge-tag i { font-size: 9px; margin-right: 3px; }
   .badge-due { background: var(--bg-3); color: var(--text-2); }
   .badge-due.overdue { background: var(--red-bg); color: var(--red-text); }
   .badge-due.today { background: var(--amber-bg); color: var(--amber-text); }
@@ -304,15 +306,15 @@
     <span id="fileSyncIndicator"></span>
     <div class="topbar-divider"></div>
     <div class="lib-dropdown" id="libDropdown">
-      <button class="btn btn-sm" onclick="event.stopPropagation();toggleLibMenu()"><i class="fa-solid fa-database"></i> Library <i class="fa-solid fa-chevron-down" style="font-size:9px"></i></button>
+      <button class="btn btn-sm" onclick="event.stopPropagation();toggleLibMenu()"><i class="fa-solid fa-database"></i> Data <i class="fa-solid fa-chevron-down" style="font-size:9px"></i></button>
       <div class="split-btn-menu" id="libMenu" style="left:auto;right:0">
         <div class="split-btn-menu-item" onclick="exportLibrary();closeLibMenu()">
           <i class="fa-solid fa-download split-btn-menu-icon"></i>
-          <div><div class="split-btn-menu-label">Export</div><div class="split-btn-menu-desc">Download library as .json</div></div>
+          <div><div class="split-btn-menu-label">Export</div><div class="split-btn-menu-desc">Download data as .json</div></div>
         </div>
         <div class="split-btn-menu-item" onclick="triggerImport();closeLibMenu()">
           <i class="fa-solid fa-upload split-btn-menu-icon"></i>
-          <div><div class="split-btn-menu-label">Import</div><div class="split-btn-menu-desc">Load a .json library file</div></div>
+          <div><div class="split-btn-menu-label">Import</div><div class="split-btn-menu-desc">Load a .json data file</div></div>
         </div>
       </div>
     </div>
@@ -355,6 +357,10 @@
     <div class="sidebar-section">
       <div class="sidebar-section-label">Priority</div>
       <div class="filter-chips" id="priorityChips"></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Tags</div>
+      <div class="filter-chips" id="tagChips"></div>
     </div>
     <div class="sidebar-section grow">
       <div class="sidebar-section-label">Projects <button class="icon-btn" onclick="openProjectModal()" title="New project"><i class="fa-solid fa-plus"></i></button></div>
@@ -417,8 +423,8 @@
 <!-- Import modal -->
 <div class="modal-bg" id="importModalBg" onclick="if(event.target===this) closeAllModals()">
   <div class="modal">
-    <h3>Import library</h3>
-    <p>Merge the imported file into your current tasks and projects, or replace everything with the file's contents? Replacing automatically downloads a backup of your current library first.</p>
+    <h3>Import data</h3>
+    <p>Merge the imported file into your current tasks and projects, or replace everything with the file's contents? Replacing automatically downloads a backup of your current data first.</p>
     <div class="modal-actions">
       <button class="btn" onclick="closeAllModals()">Cancel</button>
       <button class="btn" onclick="applyImport('merge')">Merge</button>
@@ -434,7 +440,7 @@
     <div>
       <div class="help-row"><i class="fa-solid fa-hard-drive"></i><span><strong style="color:var(--text)">Your data is stored locally</strong> in this browser (localStorage). It persists between sessions on this device but isn't synced anywhere.</span></div>
       <div class="help-row"><i class="fa-solid fa-link"></i><span><strong style="color:var(--text)">Link file</strong> (Chrome/Edge) auto-saves every change to a real <code style="font-family:var(--mono);font-size:11px">.json</code> file on your disk, so your data survives even if browser storage is cleared.</span></div>
-      <div class="help-row"><i class="fa-solid fa-download"></i><span><strong style="color:var(--text)">Export</strong> downloads a one-off backup. <strong style="color:var(--text)">Import</strong> loads a backup back in, merging or replacing your current library.</span></div>
+      <div class="help-row"><i class="fa-solid fa-download"></i><span><strong style="color:var(--text)">Export</strong> downloads a one-off backup. <strong style="color:var(--text)">Import</strong> loads a backup back in, merging or replacing your current data.</span></div>
     </div>
     <div class="help-tip">Nothing here ever leaves your machine — there's no server, no account, and no admin rights required to run this app.</div>
     <div class="modal-actions"><button class="btn btn-primary" onclick="closeAllModals()">Got it</button></div>
@@ -509,6 +515,12 @@ const REPEATS = [
   {id:'monthly', label:'Monthly'},
   {id:'yearly',  label:'Yearly'}
 ];
+// Fixed context tags — intentionally not user-editable (no add/rename/delete UI).
+const TAGS = [
+  {id:'waiting-on',  label:'Waiting on',  icon:'fa-hourglass-half'},
+  {id:'deep-work',   label:'Deep work',   icon:'fa-brain'},
+  {id:'someday',     label:'Someday',     icon:'fa-cloud'}
+];
 const COMPLETED_RETENTION_DAYS = 90;
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -520,7 +532,7 @@ let renamingSubtask = null; // {taskId, subId}
 let selectedTaskIds = new Set();
 let lastClickedTaskId = null;
 let inlineAddSubtaskTaskId = null;
-let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id);
+let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id), filterTags = TAGS.map(t=>t.id);
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
@@ -576,6 +588,8 @@ function load(){
     }
     tasks.forEach(t=>{
       if(!t.subtasks) t.subtasks=[];
+      if(!Array.isArray(t.tags)) t.tags=[];
+      t.tags = t.tags.filter(id=>TAGS.some(tg=>tg.id===id));
       if(!t.priority) t.priority='medium';
       if(!t.status) t.status='todo';
       if(t.completedAt===undefined) t.completedAt = (t.status==='done' && t.updatedAt) ? t.updatedAt : null;
@@ -598,7 +612,7 @@ function load(){
   }
 }
 function save(){
-  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, compactMode };
+  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, compactMode };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(fileHandle) fileSyncWrite(data).catch(()=>{});
 }
@@ -620,6 +634,8 @@ function genId(){ return Date.now().toString(36)+Math.random().toString(36).slic
 function normFilterArr(v, allIds){ if(Array.isArray(v)) return v; if(v) return [v]; return allIds; }
 function normStatusFilter(v){ return normFilterArr(v, STATUSES.map(s=>s.id)); }
 function normPriorityFilter(v){ return normFilterArr(v, PRIORITIES.map(p=>p.id)); }
+function normTagFilter(v){ return normFilterArr(v, TAGS.map(t=>t.id)); }
+function tagById(id){ return TAGS.find(t=>t.id===id); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function highlightMatch(text, query){
   if(!query) return esc(text);
@@ -756,6 +772,13 @@ function renderSidebar(){
     return `<div class="f-chip ${active?'active':''}" style="${active?`background:${p.bg};color:${p.text};border-color:${p.text}`:''}" role="button" tabindex="0" aria-pressed="${active}" onclick="setPriorityFilter('${p.id}')">${esc(p.label)}</div>`;
   }).join('');
 
+  document.getElementById('tagChips').innerHTML = `
+    <div class="f-chip ${filterTags.length===TAGS.length?'active':''}" role="button" tabindex="0" aria-pressed="${filterTags.length===TAGS.length}" onclick="setTagFilter(null)">All</div>
+  ` + TAGS.map(tg=>{
+    const active = filterTags.includes(tg.id);
+    return `<div class="f-chip ${active?'active':''}" role="button" tabindex="0" aria-pressed="${active}" onclick="setTagFilter('${tg.id}')"><i class="fa-solid ${tg.icon}" style="font-size:10px"></i> ${esc(tg.label)}</div>`;
+  }).join('');
+
   document.getElementById('projectList').innerHTML = projects.map(p=>{
     const c = colorOf(p.color);
     return `<div class="project-row ${filterProjectId===p.id?'active':''}" data-id="${p.id}" role="button" tabindex="0" aria-pressed="${filterProjectId===p.id}" onclick="setProjectFilter('${p.id}')"
@@ -793,10 +816,14 @@ function getFilteredSortedTasks(){
     if(overdueFilter && !isOverdue(t)) return false;
     if(!filterStatus.includes(t.status)) return false;
     if(!filterPriority.includes(t.priority)) return false;
+    if(filterTags.length<TAGS.length){
+      if(!(t.tags||[]).some(tg=>filterTags.includes(tg))) return false;
+    }
     if(searchQuery){
       const q = searchQuery.toLowerCase();
       const subtaskText = (t.subtasks||[]).map(s=>s.text).join(' ');
-      const hay = (t.title+' '+(t.notes||'')+' '+subtaskText).toLowerCase();
+      const tagText = (t.tags||[]).map(id=>(tagById(id)||{}).label||'').join(' ');
+      const hay = (t.title+' '+(t.notes||'')+' '+subtaskText+' '+tagText).toLowerCase();
       if(!hay.includes(q)) return false;
     }
     return true;
@@ -838,6 +865,7 @@ function renderList(){
         ${renamingTaskId===t.id
           ? `<input type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
           : `<span class="task-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${highlightMatch(t.title, searchQuery)}</span>`}
+        ${(t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; return `<span class="badge badge-tag"><i class="fa-solid ${tg.icon}"></i>${esc(tg.label)}</span>`; }).join('')}
       </div>
       <div class="task-cell"><span class="badge-project"${proj&&proj.name.length>20?` data-tooltip="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span></div>
       <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${t.priority}</span></div>
@@ -1051,6 +1079,12 @@ function renderDrawer(){
           <input type="date" value="${t.dueDate||''}" onchange="updateTaskField('${t.id}','dueDate',this.value||null)">
         </div>
       </div>
+      <div class="field">
+        <label>Tags</label>
+        <div class="filter-chips">
+          ${TAGS.map(tg=>{ const active=(t.tags||[]).includes(tg.id); return `<div class="f-chip ${active?'active':''}" role="button" tabindex="0" aria-pressed="${active}" onclick="toggleTaskTag('${t.id}','${tg.id}')"><i class="fa-solid ${tg.icon}" style="font-size:10px"></i> ${esc(tg.label)}</div>`; }).join('')}
+        </div>
+      </div>
       <div class="field-row">
         <div class="field">
           <label style="display:flex;justify-content:space-between;align-items:center">
@@ -1232,6 +1266,15 @@ function updateTaskField(id, field, value){
     task.updatedAt = Date.now();
     save(); render();
   });
+}
+function toggleTaskTag(id, tagId){
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  if(!TAGS.some(tg=>tg.id===tagId)) return;
+  const tags = new Set(t.tags || []);
+  if(tags.has(tagId)) tags.delete(tagId); else tags.add(tagId);
+  t.tags = [...tags];
+  t.updatedAt = Date.now();
+  save(); render();
 }
 function toggleRepeatWeekday(id, day){
   const t = tasks.find(x=>x.id===id); if(!t) return;
@@ -1499,6 +1542,14 @@ function setPriorityFilter(p){
   filterPriority = filterPriority.includes(p) ? filterPriority.filter(x=>x!==p) : [...filterPriority, p];
   save(); render();
 }
+function setTagFilter(tg){
+  if(tg===null){
+    filterTags = filterTags.length===TAGS.length ? [] : TAGS.map(x=>x.id);
+    save(); render(); return;
+  }
+  filterTags = filterTags.includes(tg) ? filterTags.filter(x=>x!==tg) : [...filterTags, tg];
+  save(); render();
+}
 function setSortBy(v){ sortBy = v; save(); renderList(); }
 function setSearchQuery(v){ searchQuery = v; renderList(); }
 
@@ -1734,7 +1785,7 @@ function applyImport(mode){
     downloadBackup(projects, tasks, `mytasks-backup-before-replace-${new Date().toISOString().slice(0,10)}.json`);
     projects = pendingImportData.projects || defaultProjects();
     tasks = pendingImportData.tasks || [];
-    showToast('Backed up previous library, then replaced');
+    showToast('Backed up previous data, then replaced');
   } else {
     const {added, updated} = mergeData(pendingImportData);
     showToast(`Merged — ${added} added, ${updated} updated`);
@@ -1800,7 +1851,7 @@ async function _clearFileLink(){
 }
 function linkSplitBtnHtml(){
   return `<div class="split-btn" id="linkSplitBtn">
-    <button class="split-btn-main" onclick="linkFile()" title="Link an existing .json library file">
+    <button class="split-btn-main" onclick="linkFile()" title="Link an existing .json data file">
       <i class="fa-solid fa-link"></i> Link file
     </button>
     <button class="split-btn-chevron" onclick="event.stopPropagation();toggleLinkMenu()" title="More options">
@@ -1809,11 +1860,11 @@ function linkSplitBtnHtml(){
     <div class="split-btn-menu" id="linkMenu">
       <div class="split-btn-menu-item" onclick="linkFile();closeLinkMenu()">
         <i class="fa-solid fa-folder-open split-btn-menu-icon"></i>
-        <div><div class="split-btn-menu-label">Link existing file…</div><div class="split-btn-menu-desc">Open a .json library and sync to it</div></div>
+        <div><div class="split-btn-menu-label">Link existing file…</div><div class="split-btn-menu-desc">Open a .json data file and sync to it</div></div>
       </div>
       <div class="split-btn-menu-item" onclick="createNewLinkedFile();closeLinkMenu()">
         <i class="fa-solid fa-file-circle-plus split-btn-menu-icon"></i>
-        <div><div class="split-btn-menu-label">Create new file…</div><div class="split-btn-menu-desc">Save current library to a new file</div></div>
+        <div><div class="split-btn-menu-label">Create new file…</div><div class="split-btn-menu-desc">Save current data to a new file</div></div>
       </div>
     </div>
   </div>`;
@@ -1825,12 +1876,12 @@ async function createNewLinkedFile(){
   if(!window.showSaveFilePicker){ showToast('File linking requires Chrome or Edge', true); return; }
   try{
     const handle = await window.showSaveFilePicker({
-      suggestedName: 'mytasks-library.json',
+      suggestedName: 'mytasks-data.json',
       types: [{description:'JSON', accept:{'application/json':['.json']}}]
     });
     fileHandle = handle;
     try{ await _fsPut(handle); }catch(_){}
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, compactMode});
+    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, compactMode});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not create file', true); }
@@ -1857,11 +1908,11 @@ async function linkFile(){
         showToast(`Merged from ${handle.name} — ${parts.length?parts.join(', '):'nothing new'} — auto-saving enabled`);
       } else {
         fileHandle = null;
-        showToast(`${handle.name} is not a mytasks library — unlinked`, true);
+        showToast(`${handle.name} is not a mytasks data file — unlinked`, true);
       }
       return;
     }
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, compactMode});
+    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, compactMode});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not link file', true); }
@@ -1882,6 +1933,7 @@ async function reconnectFile(){
       if(data.filterProjectId!==undefined) filterProjectId = data.filterProjectId;
       if(data.filterStatus!==undefined) filterStatus = normStatusFilter(data.filterStatus);
       if(data.filterPriority!==undefined) filterPriority = normPriorityFilter(data.filterPriority);
+      if(data.filterTags!==undefined) filterTags = normTagFilter(data.filterTags);
       if(data.myDayFilter!==undefined) myDayFilter = data.myDayFilter;
       if(data.thisWeekFilter!==undefined) thisWeekFilter = data.thisWeekFilter;
       if(data.overdueFilter!==undefined) overdueFilter = data.overdueFilter;
