@@ -137,7 +137,29 @@
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
   .main-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 4px; }
   .main-title { font-size: 19px; font-weight: 600; }
+  .main-toolbar-right { display: flex; align-items: center; gap: 8px; }
   .main-toolbar select { font-size: 12px; border: 0.5px solid var(--border-2); border-radius: var(--radius); padding: 5px 8px; background: var(--bg); color: var(--text); font-family: var(--font); }
+
+  .view-switch { display: inline-flex; border: 0.5px solid var(--border-2); border-radius: var(--radius); overflow: hidden; }
+  .view-switch-btn { padding: 5px 10px; background: var(--bg); border: none; color: var(--text-3); cursor: pointer; font-size: 12px; }
+  .view-switch-btn:hover { color: var(--text); background: var(--bg-2); }
+  .view-switch-btn + .view-switch-btn { border-left: 0.5px solid var(--border-2); }
+  .view-switch-btn.active { background: var(--bg-3); color: var(--text); }
+
+  .board { display: flex; gap: 14px; padding: 4px 20px 20px; overflow-x: auto; flex: 1; align-items: flex-start; }
+  .board-col { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); width: 280px; flex-shrink: 0; display: flex; flex-direction: column; max-height: 100%; }
+  .board-col.drag-over { border-color: var(--blue-border); box-shadow: inset 0 0 0 1px var(--blue-border); }
+  .board-col-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 0.5px solid var(--border); font-size: 12px; font-weight: 600; flex-shrink: 0; }
+  .board-col-header .count { font-size: 11px; color: var(--text-3); font-weight: 500; }
+  .board-col-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; min-height: 40px; }
+  .board-empty { text-align: center; color: var(--text-3); font-size: 12px; padding: 16px 0; }
+  .board-card { background: var(--bg-2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 9px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 7px; }
+  .board-card:hover { border-color: var(--border-2); }
+  .board-card.dragging { opacity: .4; }
+  .board-card-top { display: flex; align-items: flex-start; gap: 8px; }
+  .board-card-title { font-size: 13px; font-weight: 500; flex: 1; word-break: break-word; }
+  .board-card.done .board-card-title { text-decoration: line-through; color: var(--text-3); }
+  .board-card-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
 
   .quickadd { display: flex; align-items: center; gap: 8px; margin: 12px 20px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 2px; }
   .quickadd i { color: var(--text-3); margin-left: 10px; font-size: 13px; }
@@ -373,23 +395,30 @@
   <div class="main">
     <div class="main-toolbar">
       <div class="main-title" id="mainTitle">All Tasks</div>
-      <select id="sortSelect" onchange="setSortBy(this.value)">
-        <option value="smart">Smart order</option>
-        <option value="due">Due date</option>
-        <option value="priority">Priority</option>
-        <option value="created">Newest first</option>
-        <option value="alpha">Alphabetical</option>
-      </select>
+      <div class="main-toolbar-right">
+        <div class="view-switch" id="viewSwitch">
+          <button class="view-switch-btn" data-view="list" onclick="setViewMode('list')" title="List view"><i class="fa-solid fa-list"></i></button>
+          <button class="view-switch-btn" data-view="board" onclick="setViewMode('board')" title="Board view"><i class="fa-solid fa-table-columns"></i></button>
+        </div>
+        <select id="sortSelect" onchange="setSortBy(this.value)">
+          <option value="smart">Smart order</option>
+          <option value="due">Due date</option>
+          <option value="priority">Priority</option>
+          <option value="created">Newest first</option>
+          <option value="alpha">Alphabetical</option>
+        </select>
+      </div>
     </div>
     <div class="bulk-bar" id="bulkBar"></div>
     <div class="quickadd">
       <i class="fa-solid fa-plus"></i>
       <input type="text" id="quickAddInput" placeholder="Add a task and press Enter…" onkeydown="quickAddTask(event)">
     </div>
-    <div class="task-list">
+    <div class="task-list" id="taskListWrap">
       <div class="task-list-header"><span></span><span>Task</span><span>Project</span><span>Priority</span><span style="margin-left:-4px">Status</span><span style="margin-left:-8px">Due</span><span style="margin-left:-12px"></span></div>
       <div id="taskList"></div>
     </div>
+    <div class="board" id="board" style="display:none"></div>
   </div>
 </div>
 
@@ -489,6 +518,7 @@
 const STORAGE_KEY = 'mytasks_data_v1';
 const THEME_KEY = 'mytasks_theme';
 const COMPACT_KEY = 'mytasks_compact';
+const VIEW_KEY = 'mytasks_view';
 const CAT_COLORS = [
   {name:'blue',   dot:'var(--blue-dot)',   bg:'var(--blue-bg)',   text:'var(--blue-text)'},
   {name:'teal',   dot:'var(--teal-dot)',   bg:'var(--teal-bg)',   text:'var(--teal-text)'},
@@ -540,6 +570,8 @@ let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
 let compactMode = true;
+let viewMode = 'list';
+let draggingTaskId = null;
 let modalTarget = null, pendingImportData = null;
 let editingProjectId = null, newProjColor = 'blue';
 
@@ -550,6 +582,7 @@ let editingProjectId = null, newProjColor = 'blue';
   document.documentElement.setAttribute('data-theme', currentTheme);
 })();
 (function(){ const c=localStorage.getItem(COMPACT_KEY); if(c!==null){compactMode = c==='1';} document.documentElement.setAttribute('data-density', compactMode?'compact':''); })();
+(function(){ const v=localStorage.getItem(VIEW_KEY); if(v==='board'||v==='list'){ viewMode=v; } })();
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 function defaultProjects(){
@@ -585,6 +618,7 @@ function load(){
       sortBy = d.sortBy || 'smart';
       if(d.theme){ currentTheme=d.theme; document.documentElement.setAttribute('data-theme',d.theme); localStorage.setItem(THEME_KEY,d.theme); }
       if(d.compactMode!==undefined){ compactMode=d.compactMode; document.documentElement.setAttribute('data-density', compactMode?'compact':''); localStorage.setItem(COMPACT_KEY, compactMode?'1':'0'); }
+      if(d.viewMode==='board'||d.viewMode==='list'){ viewMode=d.viewMode; localStorage.setItem(VIEW_KEY, viewMode); }
     } else {
       projects = defaultProjects();
       tasks = defaultTasks();
@@ -615,7 +649,7 @@ function load(){
   }
 }
 function save(){
-  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, compactMode };
+  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, compactMode, viewMode };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(fileHandle) fileSyncWrite(data).catch(()=>{});
 }
@@ -735,9 +769,19 @@ function isThisWeek(dueDate){
 // ── Render ────────────────────────────────────────────────────────────────────
 function render(){
   renderSidebar();
-  renderList();
+  if(viewMode==='board'){ renderBoard(); } else { renderList(); }
   renderDrawer();
   renderBulkBar();
+  updateViewModeUI();
+}
+function updateViewModeUI(){
+  const listWrap = document.getElementById('taskListWrap');
+  const board = document.getElementById('board');
+  if(listWrap) listWrap.style.display = viewMode==='board' ? 'none' : '';
+  if(board) board.style.display = viewMode==='board' ? '' : 'none';
+  document.querySelectorAll('.view-switch-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.view===viewMode);
+  });
 }
 
 function taskCountsForProject(pid){
@@ -812,26 +856,28 @@ const sortComparators = {
   alpha: (a,b)=> a.title.localeCompare(b.title)
 };
 
+function taskMatchesFilters(t, opts){
+  opts = opts || {};
+  if(filterProjectId && t.projectId!==filterProjectId) return false;
+  if(myDayFilter && t.dueDate!==todayStr()) return false;
+  if(thisWeekFilter && !isThisWeek(t.dueDate)) return false;
+  if(overdueFilter && !isOverdue(t)) return false;
+  if(!opts.ignoreStatus && !filterStatus.includes(t.status)) return false;
+  if(!filterPriority.includes(t.priority)) return false;
+  if(filterTags.length<TAGS.length){
+    if(!(t.tags||[]).some(tg=>filterTags.includes(tg))) return false;
+  }
+  if(searchQuery){
+    const q = searchQuery.toLowerCase();
+    const subtaskText = (t.subtasks||[]).map(s=>s.text).join(' ');
+    const tagText = (t.tags||[]).map(id=>(tagById(id)||{}).label||'').join(' ');
+    const hay = (t.title+' '+(t.notes||'')+' '+subtaskText+' '+tagText).toLowerCase();
+    if(!hay.includes(q)) return false;
+  }
+  return true;
+}
 function getFilteredSortedTasks(){
-  let list = tasks.filter(t=>{
-    if(filterProjectId && t.projectId!==filterProjectId) return false;
-    if(myDayFilter && t.dueDate!==todayStr()) return false;
-    if(thisWeekFilter && !isThisWeek(t.dueDate)) return false;
-    if(overdueFilter && !isOverdue(t)) return false;
-    if(!filterStatus.includes(t.status)) return false;
-    if(!filterPriority.includes(t.priority)) return false;
-    if(filterTags.length<TAGS.length){
-      if(!(t.tags||[]).some(tg=>filterTags.includes(tg))) return false;
-    }
-    if(searchQuery){
-      const q = searchQuery.toLowerCase();
-      const subtaskText = (t.subtasks||[]).map(s=>s.text).join(' ');
-      const tagText = (t.tags||[]).map(id=>(tagById(id)||{}).label||'').join(' ');
-      const hay = (t.title+' '+(t.notes||'')+' '+subtaskText+' '+tagText).toLowerCase();
-      if(!hay.includes(q)) return false;
-    }
-    return true;
-  });
+  let list = tasks.filter(t=>taskMatchesFilters(t));
   const cmp = sortComparators[sortBy] || sortComparators.smart;
   return list.sort((a,b)=>{
     if((a.status==='done')!==(b.status==='done')) return a.status==='done'?1:-1;
@@ -892,6 +938,81 @@ function renderList(){
       </div>
     </div>`;
   }).join('');
+}
+
+// ── Board view ────────────────────────────────────────────────────────────────
+function boardCardHtml(t){
+  const proj = projById(t.projectId);
+  const c = proj ? colorOf(proj.color) : colorOf('blue');
+  let dueBadge = '';
+  if(t.dueDate){
+    const overdue = isOverdue(t);
+    const isToday = t.dueDate === todayStr();
+    dueBadge = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${fmtDate(t.dueDate)}</span>`;
+  }
+  const tagBadges = (t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; return `<span class="badge badge-tag">${esc(tg.label)}</span>`; }).join('');
+  return `<div class="board-card ${t.status==='done'?'done':''}" data-id="${t.id}" draggable="true"
+      ondragstart="handleCardDragStart(event,'${t.id}')" ondragend="handleCardDragEnd(event)"
+      onclick="openTask('${t.id}')">
+    <div class="board-card-top">
+      <div class="task-checkbox ${t.status==='done'?'checked':''} ${t.id===justCompletedTaskId?'pop':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
+      <div class="board-card-title">${highlightMatch(t.title, searchQuery)}</div>
+    </div>
+    <div class="board-card-meta">
+      <span class="badge-project"${proj&&proj.name.length>20?` data-tooltip="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span>
+      <span class="badge badge-priority-${t.priority}">${priorityLabel(t.priority)}</span>
+      ${dueBadge}
+      ${tagBadges}
+    </div>
+  </div>`;
+}
+function renderBoard(){
+  const board = document.getElementById('board');
+  if(!board) return;
+  const filtered = tasks.filter(t=>taskMatchesFilters(t, {ignoreStatus:true}));
+  const cmp = sortComparators[sortBy] || sortComparators.smart;
+  board.innerHTML = STATUSES.map(st=>{
+    const colTasks = filtered.filter(t=>t.status===st.id).sort(cmp);
+    return `<div class="board-col" data-status="${st.id}" ondragover="handleBoardDragOver(event,'${st.id}')" ondragleave="handleBoardDragLeave(event)" ondrop="handleBoardDrop(event,'${st.id}')">
+      <div class="board-col-header"><span>${esc(st.label)}</span><span class="count">${colTasks.length}</span></div>
+      <div class="board-col-body">
+        ${colTasks.length===0 ? `<div class="board-empty">No tasks</div>` : colTasks.map(t=>boardCardHtml(t)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+function handleCardDragStart(e, id){
+  draggingTaskId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.target.closest('.board-card').classList.add('dragging');
+}
+function handleCardDragEnd(e){
+  draggingTaskId = null;
+  document.querySelectorAll('.board-card.dragging').forEach(el=>el.classList.remove('dragging'));
+  document.querySelectorAll('.board-col.drag-over').forEach(el=>el.classList.remove('drag-over'));
+}
+function handleBoardDragOver(e, statusId){
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function handleBoardDragLeave(e){
+  e.currentTarget.classList.remove('drag-over');
+}
+function handleBoardDrop(e, statusId){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(!draggingTaskId) return;
+  const id = draggingTaskId; draggingTaskId = null;
+  const t = tasks.find(x=>x.id===id);
+  if(!t || t.status===statusId) return;
+  updateTaskField(id, 'status', statusId);
+}
+function setViewMode(mode){
+  if(mode===viewMode || (mode!=='board' && mode!=='list')) return;
+  viewMode = mode;
+  selectedTaskIds.clear();
+  localStorage.setItem(VIEW_KEY, viewMode);
+  save(); render();
 }
 
 // ── Drawer ────────────────────────────────────────────────────────────────────
@@ -1890,7 +2011,7 @@ async function createNewLinkedFile(){
     });
     fileHandle = handle;
     try{ await _fsPut(handle); }catch(_){}
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, compactMode});
+    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, compactMode, viewMode});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not create file', true); }
@@ -1921,7 +2042,7 @@ async function linkFile(){
       }
       return;
     }
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, compactMode});
+    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, compactMode, viewMode});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not link file', true); }
