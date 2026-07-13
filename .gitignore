@@ -1,1 +1,3 @@
 .claude/
+.mytasks-server.pid
+.mytasks-server.log

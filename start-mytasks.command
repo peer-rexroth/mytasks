@@ -1,0 +1,33 @@
+#!/bin/bash
+# Launches mytasks on a local server (needed for PWA install/offline support,
+# which browsers refuse to enable for file:// pages) and opens it in Chrome.
+set -e
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$DIR"
+
+PORT=8934
+PID_FILE="$DIR/.mytasks-server.pid"
+LOG_FILE="$DIR/.mytasks-server.log"
+URL="http://127.0.0.1:$PORT/mytasks.html"
+
+is_up() {
+  curl -s -o /dev/null --max-time 1 "http://127.0.0.1:$PORT/manifest.json"
+}
+
+if ! is_up; then
+  # Clear a stale pid file from a server that's no longer running.
+  if [ -f "$PID_FILE" ] && ! kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    rm -f "$PID_FILE"
+  fi
+  if [ -f "$PID_FILE" ]; then
+    echo "Port $PORT looks busy with something other than mytasks. Edit PORT in this script to change it."
+  else
+    nohup python3 -m http.server "$PORT" --bind 127.0.0.1 > "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+    echo "Started mytasks server on $URL (pid $(cat "$PID_FILE"))"
+    sleep 0.6
+  fi
+fi
+
+open "$URL"
