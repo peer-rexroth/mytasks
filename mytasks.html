@@ -49,7 +49,7 @@
 
   html, body { height: 100%; }
   body { font-family: var(--font); background: var(--bg-2); color: var(--text); font-size: 15px; line-height: 1.5; display: flex; flex-direction: column; min-height: 100vh; }
-  body, .topbar, .sidebar, .main, .task-row, .project-row, .nav-item,
+  body, .topbar, .sidebar, .main, .project-row, .nav-item,
   .modal, .task-list-header, .quickadd, .bulk-bar,
   input, select, textarea {
     transition: background-color .2s ease, color .2s ease, border-color .2s ease;
@@ -162,11 +162,13 @@
   .task-row.kbd-selected.bulk-selected { background: var(--purple-bg); border-color: var(--purple-text); box-shadow: 0 0 0 1px var(--purple-text); }
   .task-row.done .task-title { text-decoration: line-through; color: var(--text-3); }
 
-  .task-checkbox { grid-area: check; width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: all .15s; }
+  .task-checkbox { grid-area: check; width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: background-color .15s, border-color .15s; }
   .task-checkbox:hover { border-color: var(--green-text); }
   .task-checkbox.checked { background: var(--green-text); border-color: var(--green-text); }
   .task-checkbox i { font-size: 10px; color: #fff; opacity: 0; transition: opacity .1s; }
   .task-checkbox.checked i { opacity: 1; }
+  @keyframes checkPop { 0%{ transform: scale(1); } 40%{ transform: scale(1.35); } 100%{ transform: scale(1); } }
+  .task-checkbox.pop, .mini-check.pop, .sub-check.pop { animation: checkPop .3s ease; }
 
   .task-main { grid-area: title; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .task-title { font-size: 14px; font-weight: 500; word-break: break-word; }
@@ -183,7 +185,7 @@
 
   .task-subtasks { grid-area: sub; padding-left: 10px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
   .task-subtask-row { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); }
-  .task-subtask-row .mini-check { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg-2); transition: all .15s; }
+  .task-subtask-row .mini-check { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg-2); transition: background-color .15s, border-color .15s; }
   .task-subtask-row .mini-check:hover { border-color: var(--green-text); }
   .task-subtask-row .mini-check.checked { background: var(--green-text); border-color: var(--green-text); }
   .task-subtask-row .mini-check i { font-size: 7px; color: #fff; opacity: 0; }
@@ -531,6 +533,8 @@ let renamingSubtask = null; // {taskId, subId}
 let selectedTaskIds = new Set();
 let lastClickedTaskId = null;
 let inlineAddSubtaskTaskId = null;
+let justCompletedTaskId = null;
+let justCompletedSubId = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id), filterTags = TAGS.map(t=>t.id);
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
 let searchQuery = '', sortBy = 'smart';
@@ -860,7 +864,7 @@ function renderList(){
       dueCell += `<i class="fa-solid fa-repeat" style="color:var(--text-3);font-size:11px;margin-left:5px" title="Repeats: ${esc(repeatSummary(t))}"></i>`;
     }
     return `<div class="task-row ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''} ${selectedTaskIds.has(t.id)?'bulk-selected':''}" data-id="${t.id}" onclick="handleRowClick(event,'${t.id}')" ondblclick="openTask('${t.id}')">
-      <div class="task-checkbox ${t.status==='done'?'checked':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
+      <div class="task-checkbox ${t.status==='done'?'checked':''} ${t.id===justCompletedTaskId?'pop':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <div class="task-main">
         ${renamingTaskId===t.id
           ? `<input type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
@@ -873,7 +877,7 @@ function renderList(){
       <div class="task-cell due">${dueCell}</div>
       ${(subTotal>0||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks">${t.subtasks.map(s=>`
         <div class="task-subtask-row ${s.done?'done':''}">
-          <div class="mini-check ${s.done?'checked':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
+          <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
           ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
             ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputList" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
             : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','list')">${highlightMatch(s.text, searchQuery)}</span>`}
@@ -1050,7 +1054,7 @@ function renderDrawer(){
 
   drawer.innerHTML = `
     <div class="drawer-header">
-      <div class="task-checkbox ${t.status==='done'?'checked':''}" style="margin-top:6px" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
+      <div class="task-checkbox ${t.status==='done'?'checked':''} ${t.id===justCompletedTaskId?'pop':''}" style="margin-top:6px" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       <input class="title-input" id="drawerTitleInput" value="${esc(t.title)}" oninput="updateTaskFieldLive('${t.id}','title',this.value)" placeholder="Task title">
       <button class="icon-btn" onclick="closeDrawer()" title="Close"><i class="fa-solid fa-xmark"></i></button>
     </div>
@@ -1129,7 +1133,7 @@ function renderDrawer(){
         ${subTotal>0?`<div class="subtask-progress">${subDone}/${subTotal} complete</div>`:''}
         ${(t.subtasks||[]).map(s=>`
           <div class="subtask-row ${s.done?'done':''}">
-            <div class="sub-check ${s.done?'checked':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
+            <div class="sub-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
             ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
               ? `<input type="text" class="sub-text-input" id="renameSubtaskInputDrawer" value="${esc(s.text)}" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
               : `<div class="sub-text" ondblclick="startRenameSubtask('${t.id}','${s.id}','drawer')">${esc(s.text)}</div>`}
@@ -1219,9 +1223,10 @@ function toggleTaskDone(id){
     const prevCompletedAt = t.completedAt;
     const result = advanceRecurring(id);
     if(!result) return;
-    if(result.ended){ t.status = 'done'; t.completedAt = Date.now(); }
+    if(result.ended){ t.status = 'done'; t.completedAt = Date.now(); justCompletedTaskId = id; }
     t.updatedAt = Date.now();
     save(); render();
+    justCompletedTaskId = null;
     const msg = result.ended ? 'Recurring series completed' : `Recurring task rescheduled to ${fmtDate(result.nextDate)}`;
     showToast(msg, false, ()=>{
       const task = tasks.find(x=>x.id===id); if(!task) return;
@@ -1237,7 +1242,9 @@ function toggleTaskDone(id){
   t.status = goingDone ? 'done' : 'todo';
   t.completedAt = goingDone ? Date.now() : null;
   t.updatedAt = Date.now();
+  if(goingDone) justCompletedTaskId = id;
   save(); render();
+  justCompletedTaskId = null;
 }
 
 function updateTaskField(id, field, value){
@@ -1406,7 +1413,9 @@ function toggleSubtask(taskId, subId){
   const s = t.subtasks.find(x=>x.id===subId); if(!s) return;
   s.done = !s.done;
   t.updatedAt = Date.now();
+  if(s.done) justCompletedSubId = subId;
   save(); render();
+  justCompletedSubId = null;
 }
 function deleteSubtask(taskId, subId){
   const t = tasks.find(x=>x.id===taskId); if(!t) return;
