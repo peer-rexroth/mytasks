@@ -964,6 +964,12 @@ function boardCardHtml(t){
       ${dueBadge}
       ${tagBadges}
     </div>
+    ${(t.subtasks||[]).length>0?`<div class="task-subtasks" style="margin-left:2px">${t.subtasks.map(s=>`
+      <div class="task-subtask-row ${s.done?'done':''}">
+        <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
+        <span onclick="event.stopPropagation()">${highlightMatch(s.text, searchQuery)}</span>
+      </div>
+    `).join('')}</div>`:''}
   </div>`;
 }
 function renderBoard(){
