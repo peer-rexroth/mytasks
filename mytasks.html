@@ -258,7 +258,12 @@
   .field-row { display: flex; gap: 10px; }
   .field-row .field { flex: 1; min-width: 0; }
 
-  .subtask-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .subtask-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-radius: 4px; }
+  .subtask-row.dragging { opacity: 0.4; }
+  .subtask-row.drag-over-top { box-shadow: inset 0 2px 0 0 var(--blue-text); }
+  .subtask-row.drag-over-bottom { box-shadow: inset 0 -2px 0 0 var(--blue-text); }
+  .subtask-row .sub-drag-handle { width: 10px; text-align: center; font-size: 11px; color: var(--text-3); flex-shrink: 0; cursor: grab; opacity: 0; }
+  .subtask-row:hover .sub-drag-handle { opacity: 1; }
   .subtask-row .sub-check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg-2); }
   .subtask-row .sub-check.checked { background: var(--green-text); border-color: var(--green-text); }
   .subtask-row .sub-check i { font-size: 8px; color: #fff; opacity: 0; }
@@ -1336,7 +1341,10 @@ function renderDrawer(){
         <label>Subtasks</label>
         ${subTotal>0?`<div class="subtask-progress">${subDone}/${subTotal} complete</div>`:''}
         ${(t.subtasks||[]).map(s=>`
-          <div class="subtask-row ${s.done?'done':''}">
+          <div class="subtask-row ${s.done?'done':''}" draggable="true"
+            ondragstart="handleSubtaskDragStart(event,'${s.id}')" ondragend="handleSubtaskDragEnd(event)"
+            ondragover="handleSubtaskDragOver(event,'${s.id}')" ondragleave="handleSubtaskDragLeave(event)" ondrop="handleSubtaskDrop(event,'${t.id}','${s.id}')">
+            <i class="fa-solid fa-grip-vertical sub-drag-handle"></i>
             <div class="sub-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
             ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
               ? `<input type="text" class="sub-text-input" id="renameSubtaskInputDrawer" value="${esc(s.text)}" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
@@ -1697,6 +1705,7 @@ function deleteProject(id){
 
 // ── Project reordering ───────────────────────────────────────────────────────
 let draggedProjectId = null;
+let draggedSubtaskId = null;
 function handleProjectDragStart(e, id){
   draggedProjectId = id;
   e.dataTransfer.effectAllowed = 'move';
@@ -1738,6 +1747,52 @@ function handleProjectDrop(e, targetId){
   draggedProjectId = null;
   save(); render();
   document.querySelector(`.project-row[data-id="${src.id}"]`)?.classList.add('settle');
+}
+
+// ── Subtask reordering ────────────────────────────────────────────────────────
+function handleSubtaskDragStart(e, subId){
+  draggedSubtaskId = subId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', subId);
+  e.currentTarget.classList.add('dragging');
+}
+function handleSubtaskDragEnd(e){
+  draggedSubtaskId = null;
+  document.querySelectorAll('.subtask-row.dragging').forEach(el=>el.classList.remove('dragging'));
+  document.querySelectorAll('.subtask-row.drag-over-top,.subtask-row.drag-over-bottom').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom'));
+}
+function handleSubtaskDragOver(e, targetSubId){
+  if(!draggedSubtaskId || draggedSubtaskId===targetSubId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const row = e.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const zone = (e.clientY - rect.top) / rect.height < 0.5 ? 'top' : 'bottom';
+  row.classList.remove('drag-over-top','drag-over-bottom');
+  row.classList.add(zone==='top' ? 'drag-over-top' : 'drag-over-bottom');
+}
+function handleSubtaskDragLeave(e){
+  e.currentTarget.classList.remove('drag-over-top','drag-over-bottom');
+}
+function handleSubtaskDrop(e, taskId, targetSubId){
+  if(!draggedSubtaskId || draggedSubtaskId===targetSubId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const row = e.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const zone = (e.clientY - rect.top) / rect.height < 0.5 ? 'top' : 'bottom';
+  row.classList.remove('drag-over-top','drag-over-bottom');
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return;
+  const srcIdx = t.subtasks.findIndex(s=>s.id===draggedSubtaskId);
+  if(srcIdx===-1) return;
+  const [src] = t.subtasks.splice(srcIdx,1);
+  const targetIdx = t.subtasks.findIndex(s=>s.id===targetSubId);
+  if(targetIdx===-1){ t.subtasks.push(src); }
+  else{ t.subtasks.splice(zone==='top' ? targetIdx : targetIdx+1, 0, src); }
+  draggedSubtaskId = null;
+  t.updatedAt = Date.now();
+  save(); render();
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
