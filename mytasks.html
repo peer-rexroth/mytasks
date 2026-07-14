@@ -937,7 +937,9 @@ function renderList(){
         ${((s.subtasks||[]).length>0||(inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id))?`<div class="task-subtasks">${(s.subtasks||[]).map(ss=>`
           <div class="task-subtask-row ${ss.done?'done':''}">
             <div class="mini-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
-            <span onclick="event.stopPropagation()">${highlightMatch(ss.text, searchQuery)}</span>
+            ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
+              ? `<input type="text" class="task-subtask-text-input" id="renameSubSubtaskInputList" value="${esc(ss.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
+              : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubSubtask('${t.id}','${s.id}','${ss.id}','list')">${highlightMatch(ss.text, searchQuery)}</span>`}
           </div>
         `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
           <input type="text" id="inlineSubtaskInput" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault(); if(event.shiftKey){outdentInlineSubtaskInput('${t.id}');}}">
@@ -1370,7 +1372,7 @@ function renderDrawer(){
                 <div class="sub-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
                 ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
                   ? `<input type="text" class="sub-text-input" id="renameSubSubtaskInputDrawer" value="${esc(ss.text)}" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
-                  : `<div class="sub-text" ondblclick="startRenameSubSubtask('${t.id}','${s.id}','${ss.id}')">${esc(ss.text)}</div>`}
+                  : `<div class="sub-text" ondblclick="startRenameSubSubtask('${t.id}','${s.id}','${ss.id}','drawer')">${esc(ss.text)}</div>`}
                 <button class="icon-btn sub-del" onclick="deleteSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-trash"></i></button>
               </div>
             `).join('')}
@@ -1678,11 +1680,17 @@ function deleteSubtask(taskId, subId){
   });
 }
 
-function startRenameSubSubtask(taskId, subId, subSubId){
+function startRenameSubSubtask(taskId, subId, subSubId, context){
   renamingSubSubtask = { taskId, subId, subSubId };
-  renderDrawer();
-  const input = document.getElementById('renameSubSubtaskInputDrawer');
-  if(input){ input.focus(); input.select(); }
+  if(context==='list'){
+    renderList();
+    const input = document.getElementById('renameSubSubtaskInputList');
+    if(input){ input.focus(); input.select(); }
+  } else {
+    renderDrawer();
+    const input = document.getElementById('renameSubSubtaskInputDrawer');
+    if(input){ input.focus(); input.select(); }
+  }
 }
 function commitRenameSubSubtask(taskId, subId, subSubId, value){
   if(!renamingSubSubtask || renamingSubSubtask.taskId!==taskId || renamingSubSubtask.subId!==subId || renamingSubSubtask.subSubId!==subSubId) return;
