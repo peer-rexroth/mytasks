@@ -1284,7 +1284,7 @@ function renderDrawer(){
       <div class="field">
         <label>Tags</label>
         <div class="filter-chips">
-          ${TAGS.map(tg=>{ const active=(t.tags||[]).includes(tg.id); return `<div class="f-chip ${active?'active':''}" role="button" tabindex="0" aria-pressed="${active}" onclick="toggleTaskTag('${t.id}','${tg.id}')">${esc(tg.label)}</div>`; }).join('')}
+          ${TAGS.map(tg=>{ const active=(t.tags||[]).includes(tg.id); const tc=colorOf(tg.color); return `<div class="f-chip ${active?'active':''}" style="${active?`background:${tc.bg};color:${tc.text};border-color:${tc.text}`:''}" role="button" tabindex="0" aria-pressed="${active}" onclick="toggleTaskTag('${t.id}','${tg.id}')">${esc(tg.label)}</div>`; }).join('')}
         </div>
       </div>
       <div class="field-row">
