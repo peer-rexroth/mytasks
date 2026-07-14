@@ -1040,8 +1040,8 @@ function handleBoardKeyNav(e){
   }
 
   if(e.key==='Tab'){
-    if(colIdx===-1) return;
     e.preventDefault();
+    if(colIdx===-1) return;
     inlineAddSubtaskTaskId = kbdSelectedTaskId;
     renderBoard();
     document.getElementById('inlineSubtaskInputBoard')?.focus();
@@ -1888,8 +1888,8 @@ function handleListKeyNav(e){
     return;
   }
   if(e.key==='Tab'){
-    if(!kbdSelectedTaskId || !list.some(t=>t.id===kbdSelectedTaskId)) return;
     e.preventDefault();
+    if(!kbdSelectedTaskId || !list.some(t=>t.id===kbdSelectedTaskId)) return;
     inlineAddSubtaskTaskId = kbdSelectedTaskId;
     renderList();
     document.getElementById('inlineSubtaskInput')?.focus();
