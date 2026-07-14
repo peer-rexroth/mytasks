@@ -158,6 +158,7 @@
   .board-card.dragging { opacity: .4; }
   .board-card.kbd-selected { border-color: var(--blue-border); box-shadow: 0 0 0 1px var(--blue-border); }
   .board-card-top { display: flex; align-items: flex-start; gap: 8px; }
+  .board-card-top .badge-due { flex-shrink: 0; }
   .board-card-title { font-size: 13px; font-weight: 500; flex: 1; word-break: break-word; }
   .board-card.done .board-card-title { text-decoration: line-through; color: var(--text-3); }
   .board-card-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
@@ -959,6 +960,7 @@ function boardCardHtml(t){
       ${renamingTaskId===t.id
         ? `<input type="text" class="task-title-input" id="renameTaskInputBoard" style="flex:1" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
         : `<div class="board-card-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${highlightMatch(t.title, searchQuery)}</div>`}
+      ${dueBadge}
     </div>
     ${(t.subtasks||[]).length>0?`<div class="task-subtasks" style="margin-left:2px">${t.subtasks.map(s=>`
       <div class="task-subtask-row ${s.done?'done':''}">
@@ -971,7 +973,6 @@ function boardCardHtml(t){
     <div class="board-card-meta">
       <span class="badge-project"${proj&&proj.name.length>20?` data-tooltip="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span>
       <span class="badge badge-priority-${t.priority}">${priorityLabel(t.priority)}</span>
-      ${dueBadge}
     </div>
     ${tagBadges?`<div class="board-card-tags">${tagBadges}</div>`:''}
   </div>`;
