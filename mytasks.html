@@ -564,11 +564,13 @@ let activeTaskId = null;
 let kbdSelectedTaskId = null;
 let renamingTaskId = null;
 let renamingSubtask = null; // {taskId, subId}
+let renamingSubSubtask = null; // {taskId, subId, subSubId}
 let selectedTaskIds = new Set();
 let lastClickedTaskId = null;
 let inlineAddSubtaskTaskId = null;
 let justCompletedTaskId = null;
 let justCompletedSubId = null;
+let justCompletedSubSubId = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id), filterTags = [];
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
 let searchQuery = '', sortBy = 'smart';
@@ -629,6 +631,7 @@ function load(){
     }
     tasks.forEach(t=>{
       if(!t.subtasks) t.subtasks=[];
+      t.subtasks.forEach(s=>{ if(!Array.isArray(s.subtasks)) s.subtasks=[]; });
       if(!Array.isArray(t.tags)) t.tags=[];
       t.tags = t.tags.filter(id=>TAGS.some(tg=>tg.id===id));
       if(!t.priority) t.priority='medium';
@@ -872,7 +875,7 @@ function taskMatchesFilters(t, opts){
   }
   if(searchQuery){
     const q = searchQuery.toLowerCase();
-    const subtaskText = (t.subtasks||[]).map(s=>s.text).join(' ');
+    const subtaskText = (t.subtasks||[]).map(s=>s.text+' '+(s.subtasks||[]).map(ss=>ss.text).join(' ')).join(' ');
     const tagText = (t.tags||[]).map(id=>(tagById(id)||{}).label||'').join(' ');
     const hay = (t.title+' '+(t.notes||'')+' '+subtaskText+' '+tagText).toLowerCase();
     if(!hay.includes(q)) return false;
@@ -930,6 +933,12 @@ function renderList(){
             ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputList" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
             : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','list')">${highlightMatch(s.text, searchQuery)}</span>`}
         </div>
+        ${(s.subtasks||[]).length>0?`<div class="task-subtasks">${s.subtasks.map(ss=>`
+          <div class="task-subtask-row ${ss.done?'done':''}">
+            <div class="mini-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
+            <span onclick="event.stopPropagation()">${highlightMatch(ss.text, searchQuery)}</span>
+          </div>
+        `).join('')}</div>`:''}
       `).join('')}${inlineAddSubtaskTaskId===t.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
         <input type="text" id="inlineSubtaskInput" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault();}">
       </div>`:''}</div>`:''}
@@ -1351,6 +1360,20 @@ function renderDrawer(){
               : `<div class="sub-text" ondblclick="startRenameSubtask('${t.id}','${s.id}','drawer')">${esc(s.text)}</div>`}
             <button class="icon-btn sub-del" onclick="deleteSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-trash"></i></button>
           </div>
+          <div class="task-subtasks" style="margin-left:14px">
+            ${(s.subtasks||[]).map(ss=>`
+              <div class="subtask-row ${ss.done?'done':''}">
+                <div class="sub-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
+                ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
+                  ? `<input type="text" class="sub-text-input" id="renameSubSubtaskInputDrawer" value="${esc(ss.text)}" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
+                  : `<div class="sub-text" ondblclick="startRenameSubSubtask('${t.id}','${s.id}','${ss.id}')">${esc(ss.text)}</div>`}
+                <button class="icon-btn sub-del" onclick="deleteSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-trash"></i></button>
+              </div>
+            `).join('')}
+            <div class="task-subtask-add-row">
+              <input type="text" id="newSubSubtaskInput-${s.id}" placeholder="Add a step + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubSubtask('${t.id}','${s.id}')}">
+            </div>
+          </div>
         `).join('')}
         <div class="add-row">
           <input type="text" id="newSubtaskInput" placeholder="Add subtask + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask('${t.id}')}">
@@ -1558,7 +1581,7 @@ function duplicateTask(id){
     repeatEndDate: t.repeatEndDate || null,
     repeatMaxOccurrences: t.repeatMaxOccurrences || null,
     repeatOccurrenceCount: 0,
-    subtasks: (t.subtasks||[]).map(s=>({id:genId(), text:s.text, done:false})),
+    subtasks: (t.subtasks||[]).map(s=>({id:genId(), text:s.text, done:false, subtasks:(s.subtasks||[]).map(ss=>({id:genId(), text:ss.text, done:false}))})),
     createdAt: Date.now(), updatedAt: Date.now()
   };
   const idx = tasks.findIndex(x=>x.id===id);
@@ -1646,6 +1669,66 @@ function deleteSubtask(taskId, subId){
   showToast('Subtask deleted', false, ()=>{
     const task = tasks.find(x=>x.id===taskId); if(!task) return;
     task.subtasks.splice(idx,0,removed);
+    task.updatedAt = Date.now();
+    save(); render();
+  });
+}
+
+function startRenameSubSubtask(taskId, subId, subSubId){
+  renamingSubSubtask = { taskId, subId, subSubId };
+  renderDrawer();
+  const input = document.getElementById('renameSubSubtaskInputDrawer');
+  if(input){ input.focus(); input.select(); }
+}
+function commitRenameSubSubtask(taskId, subId, subSubId, value){
+  if(!renamingSubSubtask || renamingSubSubtask.taskId!==taskId || renamingSubSubtask.subId!==subId || renamingSubSubtask.subSubId!==subSubId) return;
+  renamingSubSubtask = null;
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const ss = (s.subtasks||[]).find(x=>x.id===subSubId); if(!ss) return;
+  const text = value.trim();
+  if(text && text!==ss.text){ ss.text = text; t.updatedAt = Date.now(); save(); }
+  render();
+}
+function cancelRenameSubSubtask(){
+  renamingSubSubtask = null;
+  render();
+}
+function addSubSubtask(taskId, subId){
+  const input = document.getElementById(`newSubSubtaskInput-${subId}`);
+  if(!input) return;
+  const text = input.value.trim(); if(!text) return;
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  if(!Array.isArray(s.subtasks)) s.subtasks=[];
+  s.subtasks.push({id:genId(), text, done:false});
+  t.updatedAt = Date.now();
+  save(); render();
+}
+function toggleSubSubtask(taskId, subId, subSubId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const ss = (s.subtasks||[]).find(x=>x.id===subSubId); if(!ss) return;
+  ss.done = !ss.done;
+  t.updatedAt = Date.now();
+  if(ss.done) justCompletedSubSubId = subSubId;
+  save(); render();
+  justCompletedSubSubId = null;
+}
+function deleteSubSubtask(taskId, subId, subSubId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const idx = (s.subtasks||[]).findIndex(x=>x.id===subSubId);
+  if(idx===-1) return;
+  const [removed] = s.subtasks.splice(idx,1);
+  t.updatedAt = Date.now();
+  if(renamingSubSubtask && renamingSubSubtask.taskId===taskId && renamingSubSubtask.subId===subId && renamingSubSubtask.subSubId===subSubId) renamingSubSubtask = null;
+  save(); render();
+  showToast('Step deleted', false, ()=>{
+    const task = tasks.find(x=>x.id===taskId); if(!task) return;
+    const sub = (task.subtasks||[]).find(x=>x.id===subId); if(!sub) return;
+    if(!Array.isArray(sub.subtasks)) sub.subtasks=[];
+    sub.subtasks.splice(idx,0,removed);
     task.updatedAt = Date.now();
     save(); render();
   });
@@ -1867,7 +1950,7 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
-    closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renamingTaskId=null; renamingSubtask=null; selectedTaskIds.clear(); kbdSelectedTaskId=null;
+    closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; renamingTaskId=null; renamingSubtask=null; renamingSubSubtask=null; selectedTaskIds.clear(); kbdSelectedTaskId=null;
     if(viewMode==='board'){ renderBoard(); } else { renderList(); }
     renderBulkBar();
     const el = document.activeElement;
