@@ -218,7 +218,7 @@
   .task-subtask-row span { cursor: text; }
   .task-subtask-text-input { flex: 1; font-size: 13px; font-family: var(--font); border: 0.5px solid var(--border-2); border-radius: 4px; padding: 1px 5px; background: var(--bg); color: var(--text); outline: none; min-width: 60px; }
   .task-subtask-add-row { margin-top: 2px; }
-  .task-subtask-add-row input { width: 100%; border: 0.5px dashed var(--border-2); border-radius: var(--radius); padding: 4px 8px; font-size: 13px; background: transparent; color: var(--text); outline: none; font-family: var(--font); cursor: text; }
+  .task-subtask-add-row input { width: 100%; border: 0.5px dashed var(--border-2); border-radius: var(--radius); padding: 4px 8px; font-size: 13px; background: var(--bg); color: var(--text); outline: none; font-family: var(--font); cursor: text; }
   .badge { font-size: 11px; padding: 2px 7px; border-radius: 20px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
   .badge-priority-high { background: var(--red-bg); color: var(--red-text); }
   .badge-priority-medium { background: var(--bg-3); color: var(--text-2); }
@@ -960,14 +960,16 @@ function boardCardHtml(t){
       ${priorityIcon}
       ${dueBadge}
     </div>
-    ${(t.subtasks||[]).length>0?`<div class="task-subtasks" style="margin-left:2px">${t.subtasks.map(s=>`
+    ${((t.subtasks||[]).length>0||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks" style="margin-left:2px">${t.subtasks.map(s=>`
       <div class="task-subtask-row ${s.done?'done':''}">
         <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
         ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
           ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputBoard" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
           : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','board')">${highlightMatch(s.text, searchQuery)}</span>`}
       </div>
-    `).join('')}</div>`:''}
+    `).join('')}${inlineAddSubtaskTaskId===t.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
+      <input type="text" id="inlineSubtaskInputBoard" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault();}">
+    </div>`:''}</div>`:''}
     <div class="board-card-meta">
       <span class="badge-project"${proj?` data-tooltip="${esc(proj.name)}"`:''}><i class="fa-solid fa-${proj?(proj.icon||'folder'):'folder'} picon"></i><span class="pname-text">${esc(proj?proj.name:'')}</span></span>
     </div>
@@ -1025,7 +1027,7 @@ function selectBoardCard(id){
   document.querySelector(`.board-card[data-id="${kbdSelectedTaskId}"]`)?.classList.add('kbd-selected');
 }
 function handleBoardKeyNav(e){
-  if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='ArrowLeft' && e.key!=='ArrowRight' && e.key!=='Enter' && e.key!==' ') return;
+  if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='ArrowLeft' && e.key!=='ArrowRight' && e.key!=='Enter' && e.key!==' ' && e.key!=='Tab') return;
   if(isTypingTarget(document.activeElement)) return;
   if(document.querySelector('.modal-bg.open')) return;
   if(activeTaskId) return;
@@ -1037,6 +1039,15 @@ function handleBoardKeyNav(e){
     if(idx!==-1){ colIdx=i; rowIdx=idx; break; }
   }
 
+  if(e.key==='Tab'){
+    if(colIdx===-1) return;
+    e.preventDefault();
+    inlineAddSubtaskTaskId = kbdSelectedTaskId;
+    renderBoard();
+    document.getElementById('inlineSubtaskInputBoard')?.focus();
+    return;
+  }
+
   if(e.key==='Enter' || e.key===' '){
     if(colIdx!==-1){
       e.preventDefault();
@@ -1046,6 +1057,8 @@ function handleBoardKeyNav(e){
   }
 
   e.preventDefault();
+  const hadInlineAdd = inlineAddSubtaskTaskId !== null;
+  inlineAddSubtaskTaskId = null;
   if(colIdx===-1){
     colIdx = columns.findIndex(c=>c.tasks.length>0);
     if(colIdx===-1) return;
@@ -1069,10 +1082,13 @@ function handleBoardKeyNav(e){
 
   const prevId = kbdSelectedTaskId;
   kbdSelectedTaskId = columns[colIdx].tasks[rowIdx].id;
-  if(prevId){ document.querySelector(`.board-card[data-id="${prevId}"]`)?.classList.remove('kbd-selected'); }
-  const el = document.querySelector(`.board-card[data-id="${kbdSelectedTaskId}"]`);
-  el?.classList.add('kbd-selected');
-  el?.scrollIntoView({block:'nearest'});
+  if(hadInlineAdd){
+    renderBoard();
+  } else {
+    if(prevId){ document.querySelector(`.board-card[data-id="${prevId}"]`)?.classList.remove('kbd-selected'); }
+    document.querySelector(`.board-card[data-id="${kbdSelectedTaskId}"]`)?.classList.add('kbd-selected');
+  }
+  document.querySelector(`.board-card[data-id="${kbdSelectedTaskId}"]`)?.scrollIntoView({block:'nearest'});
 }
 function setViewMode(mode){
   if(mode===viewMode || (mode!=='board' && mode!=='list')) return;
@@ -1083,7 +1099,7 @@ function setViewMode(mode){
 }
 
 // ── Drawer ────────────────────────────────────────────────────────────────────
-function openTask(id){ activeTaskId = id; kbdSelectedTaskId = id; inlineAddSubtaskTaskId = null; renderDrawer(); renderList(); }
+function openTask(id){ activeTaskId = id; kbdSelectedTaskId = id; inlineAddSubtaskTaskId = null; renderDrawer(); if(viewMode==='board'){ renderBoard(); } else { renderList(); } }
 function closeDrawer(){ activeTaskId = null; renderDrawer(); }
 
 // ── Bulk selection ────────────────────────────────────────────────────────────
@@ -1846,7 +1862,8 @@ function isTypingTarget(el){
   return tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || el.isContentEditable;
 }
 function addInlineSubtask(taskId){
-  const input = document.getElementById('inlineSubtaskInput');
+  const inputId = viewMode==='board' ? 'inlineSubtaskInputBoard' : 'inlineSubtaskInput';
+  const input = document.getElementById(inputId);
   if(!input) return;
   const text = input.value.trim();
   if(!text) return;
@@ -1854,7 +1871,7 @@ function addInlineSubtask(taskId){
   t.subtasks.push({id:genId(), text, done:false});
   t.updatedAt = Date.now();
   save(); render();
-  document.getElementById('inlineSubtaskInput')?.focus();
+  document.getElementById(inputId)?.focus();
 }
 function handleListKeyNav(e){
   if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter' && e.key!==' ' && e.key!=='Tab' && e.key!=='Delete') return;
