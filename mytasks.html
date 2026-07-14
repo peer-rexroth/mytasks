@@ -159,6 +159,7 @@
   .board-card.kbd-selected { border-color: var(--blue-border); box-shadow: 0 0 0 1px var(--blue-border); }
   .board-card-top { display: flex; align-items: flex-start; gap: 8px; }
   .board-card-top .badge-due { flex-shrink: 0; }
+  .board-card-priority-icon { color: var(--red-text); font-size: 11px; flex-shrink: 0; margin-top: 2px; }
   .board-card-title { font-size: 13px; font-weight: 500; flex: 1; word-break: break-word; }
   .board-card.done .board-card-title { text-decoration: line-through; color: var(--text-3); }
   .board-card-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
@@ -225,6 +226,7 @@
   .badge-priority-medium { background: var(--bg-3); color: var(--text-2); }
   .badge-priority-low { background: var(--bg-3); color: var(--text-3); }
   .badge-tag { background: var(--bg-3); color: var(--text-2); font-size: 10.5px; }
+  .badge-tag .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
   .badge-due { background: var(--bg-3); color: var(--text-2); }
   .badge-due.overdue { background: var(--red-bg); color: var(--red-text); }
   .badge-due.today { background: var(--amber-bg); color: var(--amber-text); }
@@ -551,9 +553,9 @@ const REPEATS = [
 ];
 // Fixed context tags — intentionally not user-editable (no add/rename/delete UI).
 const TAGS = [
-  {id:'waiting-on',  label:'waiting on'},
-  {id:'deep-work',   label:'deep work'},
-  {id:'someday',     label:'someday'}
+  {id:'waiting-on',  label:'waiting on', color:'purple'},
+  {id:'deep-work',   label:'deep work',  color:'blue'},
+  {id:'someday',     label:'someday',    color:'teal'}
 ];
 const COMPLETED_RETENTION_DAYS = 90;
 
@@ -916,7 +918,7 @@ function renderList(){
         ${renamingTaskId===t.id
           ? `<input type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
           : `<span class="task-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${highlightMatch(t.title, searchQuery)}</span>`}
-        ${(t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; return `<span class="badge badge-tag">${esc(tg.label)}</span>`; }).join('')}
+        ${(t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; const tc=colorOf(tg.color); return `<span class="badge badge-tag"><span class="dot" style="background:${tc.dot}"></span>${esc(tg.label)}</span>`; }).join('')}
       </div>
       <div class="task-cell"><span class="badge-project"${proj&&proj.name.length>20?` data-tooltip="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span></div>
       <div class="task-cell priority"><span class="badge badge-priority-${t.priority}">${priorityLabel(t.priority)}</span></div>
@@ -951,12 +953,14 @@ function boardCardHtml(t){
     const isToday = t.dueDate === todayStr();
     dueBadge = `<span class="badge badge-due ${overdue?'overdue':isToday?'today':''}"><i class="fa-regular fa-calendar"></i> ${fmtDate(t.dueDate)}</span>`;
   }
-  const tagBadges = (t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; return `<span class="badge badge-tag">${esc(tg.label)}</span>`; }).join('');
+  const tagBadges = (t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; const tc=colorOf(tg.color); return `<span class="badge badge-tag"><span class="dot" style="background:${tc.dot}"></span>${esc(tg.label)}</span>`; }).join('');
+  const priorityIcon = t.priority==='high' ? `<i class="fa-solid fa-flag board-card-priority-icon" title="High priority"></i>` : '';
   return `<div class="board-card ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''}" data-id="${t.id}" draggable="true"
       ondragstart="handleCardDragStart(event,'${t.id}')" ondragend="handleCardDragEnd(event)"
       onclick="selectBoardCard('${t.id}')" ondblclick="openTask('${t.id}')">
     <div class="board-card-top">
       <div class="task-checkbox ${t.status==='done'?'checked':''} ${t.id===justCompletedTaskId?'pop':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
+      ${priorityIcon}
       ${renamingTaskId===t.id
         ? `<input type="text" class="task-title-input" id="renameTaskInputBoard" style="flex:1" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
         : `<div class="board-card-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${highlightMatch(t.title, searchQuery)}</div>`}
@@ -972,7 +976,6 @@ function boardCardHtml(t){
     `).join('')}</div>`:''}
     <div class="board-card-meta">
       <span class="badge-project"${proj&&proj.name.length>20?` data-tooltip="${esc(proj.name)}"`:''}><span class="dot" style="background:${c.dot}"></span>${esc(proj?abbreviateName(proj.name):'')}</span>
-      <span class="badge badge-priority-${t.priority}">${priorityLabel(t.priority)}</span>
     </div>
     ${tagBadges?`<div class="board-card-tags">${tagBadges}</div>`:''}
   </div>`;
