@@ -273,6 +273,8 @@
   .subtask-row .sub-text { flex: 1; font-size: 13px; cursor: text; }
   .subtask-row.done .sub-text { text-decoration: line-through; color: var(--text-3); }
   .subtask-row .sub-text-input { flex: 1; font-size: 13px; font-family: var(--font); border: 0.5px solid var(--border-2); border-radius: 4px; padding: 2px 6px; background: var(--bg-2); color: var(--text); outline: none; min-width: 60px; }
+  .sub-step-toggle { flex-shrink: 0; font-size: 11px; padding: 3px 5px; }
+  .step-count-hint { margin-left: 14px; font-size: 11px; color: var(--text-3); }
   .subtask-row .sub-del { opacity: 0; }
   .subtask-row:hover .sub-del { opacity: 1; }
   .subtask-progress { font-size: 11px; color: var(--text-3); margin-bottom: 2px; }
@@ -577,6 +579,8 @@ let justCompletedSubId = null;
 let justCompletedSubSubId = null;
 let collapsedTaskIds = new Set();
 let collapsedSubIds = new Set();
+let drawerExpandedSubIds = new Set();
+let draggedStepInfo = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id), filterTags = [];
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
 let searchQuery = '', sortBy = 'smart';
@@ -1365,7 +1369,11 @@ function renderDrawer(){
       <div class="field">
         <label>Subtasks</label>
         ${subTotal>0?`<div class="subtask-progress">${subDone}/${subTotal} complete</div>`:''}
-        ${(t.subtasks||[]).map(s=>`
+        ${(t.subtasks||[]).map(s=>{
+          const stepsOpen = drawerExpandedSubIds.has(s.id);
+          const stepCount = (s.subtasks||[]).length;
+          const toggleIcon = stepsOpen ? 'chevron-down' : (stepCount>0 ? 'chevron-right' : 'plus');
+          return `
           <div class="subtask-row ${s.done?'done':''}" draggable="true"
             ondragstart="handleSubtaskDragStart(event,'${s.id}')" ondragend="handleSubtaskDragEnd(event)"
             ondragover="handleSubtaskDragOver(event,'${s.id}')" ondragleave="handleSubtaskDragLeave(event)" ondrop="handleSubtaskDrop(event,'${t.id}','${s.id}')">
@@ -1374,11 +1382,16 @@ function renderDrawer(){
             ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
               ? `<input type="text" class="sub-text-input" id="renameSubtaskInputDrawer" value="${esc(s.text)}" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
               : `<div class="sub-text" ondblclick="startRenameSubtask('${t.id}','${s.id}','drawer')">${esc(s.text)}</div>`}
+            <button class="icon-btn sub-step-toggle" onclick="toggleDrawerStepsPanel('${s.id}');this.blur()" title="${stepsOpen?'Hide':(stepCount>0?'Show':'Add')} steps"><i class="fa-solid fa-${toggleIcon}"></i></button>
             <button class="icon-btn sub-del" onclick="deleteSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-trash"></i></button>
           </div>
+          ${stepsOpen ? `
           <div class="task-subtasks" style="margin-left:14px">
             ${(s.subtasks||[]).map(ss=>`
-              <div class="subtask-row ${ss.done?'done':''}">
+              <div class="subtask-row ${ss.done?'done':''}" draggable="true"
+                ondragstart="handleStepDragStart(event,'${s.id}','${ss.id}')" ondragend="handleStepDragEnd(event)"
+                ondragover="handleStepDragOver(event,'${s.id}','${ss.id}')" ondragleave="handleStepDragLeave(event)" ondrop="handleStepDrop(event,'${t.id}','${s.id}','${ss.id}')">
+                <i class="fa-solid fa-grip-vertical sub-drag-handle"></i>
                 <div class="sub-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
                 ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
                   ? `<input type="text" class="sub-text-input" id="renameSubSubtaskInputDrawer" value="${esc(ss.text)}" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
@@ -1387,12 +1400,13 @@ function renderDrawer(){
               </div>
             `).join('')}
             <div class="task-subtask-add-row">
-              <input type="text" id="newSubSubtaskInput-${s.id}" placeholder="Add a step + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubSubtask('${t.id}','${s.id}')}">
+              <input type="text" id="newSubSubtaskInput-${s.id}" placeholder="Add a step + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault(); if(event.shiftKey){outdentDrawerSubtaskInput('${t.id}','${s.id}');}}">
             </div>
           </div>
-        `).join('')}
+          ` : (stepCount>0 ? `<div class="step-count-hint">${stepCount} step${stepCount===1?'':'s'}</div>` : '')}
+        `;}).join('')}
         <div class="add-row">
-          <input type="text" id="newSubtaskInput" placeholder="Add subtask + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask('${t.id}')}">
+          <input type="text" id="newSubtaskInput" placeholder="Add subtask + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentDrawerSubtaskInput('${t.id}');}}">
         </div>
       </div>
     </div>
@@ -1726,6 +1740,7 @@ function addSubSubtask(taskId, subId){
   s.subtasks.push({id:genId(), text, done:false});
   t.updatedAt = Date.now();
   save(); render();
+  document.getElementById(`newSubSubtaskInput-${subId}`)?.focus();
 }
 function toggleSubSubtask(taskId, subId, subSubId){
   const t = tasks.find(x=>x.id===taskId); if(!t) return;
@@ -1959,6 +1974,86 @@ function handleSubtaskDrop(e, taskId, targetSubId){
   draggedSubtaskId = null;
   t.updatedAt = Date.now();
   save(); render();
+}
+
+// ── Step reordering (drawer) ──────────────────────────────────────────────────
+function handleStepDragStart(e, subId, stepId){
+  draggedStepInfo = { subId, stepId };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', stepId);
+  e.currentTarget.classList.add('dragging');
+}
+function handleStepDragEnd(e){
+  draggedStepInfo = null;
+  document.querySelectorAll('.subtask-row.dragging').forEach(el=>el.classList.remove('dragging'));
+  document.querySelectorAll('.subtask-row.drag-over-top,.subtask-row.drag-over-bottom').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom'));
+}
+function handleStepDragOver(e, subId, targetStepId){
+  if(!draggedStepInfo || draggedStepInfo.subId!==subId || draggedStepInfo.stepId===targetStepId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const row = e.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const zone = (e.clientY - rect.top) / rect.height < 0.5 ? 'top' : 'bottom';
+  row.classList.remove('drag-over-top','drag-over-bottom');
+  row.classList.add(zone==='top' ? 'drag-over-top' : 'drag-over-bottom');
+}
+function handleStepDragLeave(e){
+  e.currentTarget.classList.remove('drag-over-top','drag-over-bottom');
+}
+function handleStepDrop(e, taskId, subId, targetStepId){
+  if(!draggedStepInfo || draggedStepInfo.subId!==subId || draggedStepInfo.stepId===targetStepId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const row = e.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const zone = (e.clientY - rect.top) / rect.height < 0.5 ? 'top' : 'bottom';
+  row.classList.remove('drag-over-top','drag-over-bottom');
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId);
+  if(!s) return;
+  const srcIdx = s.subtasks.findIndex(x=>x.id===draggedStepInfo.stepId);
+  if(srcIdx===-1) return;
+  const [src] = s.subtasks.splice(srcIdx,1);
+  const targetIdx = s.subtasks.findIndex(x=>x.id===targetStepId);
+  if(targetIdx===-1){ s.subtasks.push(src); }
+  else{ s.subtasks.splice(zone==='top' ? targetIdx : targetIdx+1, 0, src); }
+  draggedStepInfo = null;
+  t.updatedAt = Date.now();
+  save(); renderDrawer();
+}
+
+// ── Drawer subtask steps panel ────────────────────────────────────────────────
+function toggleDrawerStepsPanel(subId){
+  if(drawerExpandedSubIds.has(subId)) drawerExpandedSubIds.delete(subId);
+  else drawerExpandedSubIds.add(subId);
+  renderDrawer();
+}
+function indentDrawerSubtaskInput(taskId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const input = document.getElementById('newSubtaskInput');
+  const val = input ? input.value.trim() : '';
+  let carryOverText = val;
+  if(!t.subtasks.length){
+    if(!val) return;
+    t.subtasks.push({id:genId(), text:val, done:false, subtasks:[]});
+    t.updatedAt = Date.now();
+    save();
+    carryOverText = '';
+  }
+  const lastSub = t.subtasks[t.subtasks.length-1];
+  drawerExpandedSubIds.add(lastSub.id);
+  renderDrawer();
+  const newInput = document.getElementById(`newSubSubtaskInput-${lastSub.id}`);
+  if(newInput){ newInput.value = carryOverText; newInput.focus(); }
+}
+function outdentDrawerSubtaskInput(taskId, subId){
+  const input = document.getElementById(`newSubSubtaskInput-${subId}`);
+  const val = input ? input.value : '';
+  renderDrawer();
+  const newInput = document.getElementById('newSubtaskInput');
+  if(newInput){ newInput.value = val; newInput.focus(); }
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
