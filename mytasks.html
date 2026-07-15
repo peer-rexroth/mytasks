@@ -585,7 +585,7 @@ let justCompletedSubSubId = null;
 let collapsedTaskIds = new Set();
 let collapsedSubIds = new Set();
 let drawerExpandedSubIds = new Set();
-let draggedStepInfo = null;
+let draggedItem = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id), filterTags = [];
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
 let searchQuery = '', sortBy = 'smart';
@@ -948,8 +948,8 @@ function renderList(){
       <div class="task-cell due">${dueCell}</div>
       ${((subTotal>0 && !collapsedTaskIds.has(t.id))||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks">${t.subtasks.map(s=>`
         <div class="task-subtask-row ${s.done?'done':''}" draggable="true"
-          ondragstart="handleSubtaskDragStart(event,'${s.id}')" ondragend="handleSubtaskDragEnd(event)"
-          ondragover="handleSubtaskDragOver(event,'${s.id}')" ondragleave="handleSubtaskDragLeave(event)" ondrop="handleSubtaskDrop(event,'${t.id}','${s.id}')">
+          ondragstart="handleHierarchyDragStart(event,'subtask','${s.id}')" ondragend="handleHierarchyDragEnd(event)"
+          ondragover="handleHierarchyDragOver(event,'subtask','${s.id}')" ondragleave="handleHierarchyDragLeave(event)" ondrop="handleHierarchyDrop(event,'${t.id}','subtask','${s.id}')">
           ${(s.subtasks||[]).length>0?`<button class="icon-btn subtask-toggle" onclick="event.stopPropagation();toggleSubCollapse('${s.id}');this.blur()" title="${collapsedSubIds.has(s.id)?'Expand':'Collapse'} steps"><i class="fa-solid fa-chevron-${collapsedSubIds.has(s.id)?'right':'down'}"></i></button>`:''}
           <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
           ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
@@ -959,8 +959,8 @@ function renderList(){
         </div>
         ${(((s.subtasks||[]).length>0 && !collapsedSubIds.has(s.id))||(inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id))?`<div class="task-subtasks" style="margin-left:21px">${(s.subtasks||[]).map(ss=>`
           <div class="task-subtask-row ${ss.done?'done':''}" draggable="true"
-            ondragstart="handleStepDragStart(event,'${s.id}','${ss.id}')" ondragend="handleStepDragEnd(event)"
-            ondragover="handleStepDragOver(event,'${s.id}','${ss.id}')" ondragleave="handleStepDragLeave(event)" ondrop="handleStepDrop(event,'${t.id}','${s.id}','${ss.id}')">
+            ondragstart="handleHierarchyDragStart(event,'step','${s.id}','${ss.id}')" ondragend="handleHierarchyDragEnd(event)"
+            ondragover="handleHierarchyDragOver(event,'step','${s.id}','${ss.id}')" ondragleave="handleHierarchyDragLeave(event)" ondrop="handleHierarchyDrop(event,'${t.id}','step','${s.id}','${ss.id}')">
             <div class="mini-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
             ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
               ? `<input type="text" class="task-subtask-text-input" id="renameSubSubtaskInputList" value="${esc(ss.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
@@ -1408,8 +1408,8 @@ function renderDrawer(){
           const toggleIcon = stepsOpen ? 'chevron-down' : (stepCount>0 ? 'chevron-right' : 'plus');
           return `
           <div class="subtask-row ${s.done?'done':''}" draggable="true"
-            ondragstart="handleSubtaskDragStart(event,'${s.id}')" ondragend="handleSubtaskDragEnd(event)"
-            ondragover="handleSubtaskDragOver(event,'${s.id}')" ondragleave="handleSubtaskDragLeave(event)" ondrop="handleSubtaskDrop(event,'${t.id}','${s.id}')">
+            ondragstart="handleHierarchyDragStart(event,'subtask','${s.id}')" ondragend="handleHierarchyDragEnd(event)"
+            ondragover="handleHierarchyDragOver(event,'subtask','${s.id}')" ondragleave="handleHierarchyDragLeave(event)" ondrop="handleHierarchyDrop(event,'${t.id}','subtask','${s.id}')">
             <i class="fa-solid fa-grip-vertical sub-drag-handle"></i>
             <div class="sub-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
             ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
@@ -1423,8 +1423,8 @@ function renderDrawer(){
           <div class="task-subtasks" style="margin-left:24px">
             ${(s.subtasks||[]).map(ss=>`
               <div class="subtask-row ${ss.done?'done':''}" draggable="true"
-                ondragstart="handleStepDragStart(event,'${s.id}','${ss.id}')" ondragend="handleStepDragEnd(event)"
-                ondragover="handleStepDragOver(event,'${s.id}','${ss.id}')" ondragleave="handleStepDragLeave(event)" ondrop="handleStepDrop(event,'${t.id}','${s.id}','${ss.id}')">
+                ondragstart="handleHierarchyDragStart(event,'step','${s.id}','${ss.id}')" ondragend="handleHierarchyDragEnd(event)"
+                ondragover="handleHierarchyDragOver(event,'step','${s.id}','${ss.id}')" ondragleave="handleHierarchyDragLeave(event)" ondrop="handleHierarchyDrop(event,'${t.id}','step','${s.id}','${ss.id}')">
                 <i class="fa-solid fa-grip-vertical sub-drag-handle"></i>
                 <div class="sub-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
                 ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
@@ -1926,7 +1926,6 @@ function deleteProject(id){
 
 // ── Project reordering ───────────────────────────────────────────────────────
 let draggedProjectId = null;
-let draggedSubtaskId = null;
 function handleProjectDragStart(e, id){
   draggedProjectId = id;
   e.dataTransfer.effectAllowed = 'move';
@@ -1971,19 +1970,25 @@ function handleProjectDrop(e, targetId){
 }
 
 // ── Subtask reordering ────────────────────────────────────────────────────────
-function handleSubtaskDragStart(e, subId){
-  draggedSubtaskId = subId;
+function handleHierarchyDragStart(e, type, subId, stepId){
+  draggedItem = type==='subtask' ? {type, subId} : {type, subId, stepId};
   e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', subId);
+  e.dataTransfer.setData('text/plain', stepId||subId);
   e.currentTarget.classList.add('dragging');
 }
-function handleSubtaskDragEnd(e){
-  draggedSubtaskId = null;
+function handleHierarchyDragEnd(e){
+  draggedItem = null;
   document.querySelectorAll('.subtask-row.dragging,.task-subtask-row.dragging').forEach(el=>el.classList.remove('dragging'));
   document.querySelectorAll('.subtask-row.drag-over-top,.subtask-row.drag-over-bottom,.task-subtask-row.drag-over-top,.task-subtask-row.drag-over-bottom').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom'));
 }
-function handleSubtaskDragOver(e, targetSubId){
-  if(!draggedSubtaskId || draggedSubtaskId===targetSubId) return;
+function isNoOpHierarchyTarget(targetType, targetSubId, targetStepId){
+  if(!draggedItem) return true;
+  if(draggedItem.type==='subtask' && targetType==='subtask' && draggedItem.subId===targetSubId) return true;
+  if(draggedItem.type==='step' && targetType==='step' && draggedItem.stepId===targetStepId) return true;
+  return false;
+}
+function handleHierarchyDragOver(e, targetType, targetSubId, targetStepId){
+  if(isNoOpHierarchyTarget(targetType, targetSubId, targetStepId)) return;
   e.preventDefault();
   e.stopPropagation();
   const row = e.currentTarget;
@@ -1992,11 +1997,11 @@ function handleSubtaskDragOver(e, targetSubId){
   row.classList.remove('drag-over-top','drag-over-bottom');
   row.classList.add(zone==='top' ? 'drag-over-top' : 'drag-over-bottom');
 }
-function handleSubtaskDragLeave(e){
+function handleHierarchyDragLeave(e){
   e.currentTarget.classList.remove('drag-over-top','drag-over-bottom');
 }
-function handleSubtaskDrop(e, taskId, targetSubId){
-  if(!draggedSubtaskId || draggedSubtaskId===targetSubId) return;
+function handleHierarchyDrop(e, taskId, targetType, targetSubId, targetStepId){
+  if(isNoOpHierarchyTarget(targetType, targetSubId, targetStepId)) return;
   e.preventDefault();
   e.stopPropagation();
   const row = e.currentTarget;
@@ -2005,61 +2010,68 @@ function handleSubtaskDrop(e, taskId, targetSubId){
   row.classList.remove('drag-over-top','drag-over-bottom');
   const t = tasks.find(x=>x.id===taskId);
   if(!t) return;
-  const srcIdx = t.subtasks.findIndex(s=>s.id===draggedSubtaskId);
-  if(srcIdx===-1) return;
-  const [src] = t.subtasks.splice(srcIdx,1);
-  const targetIdx = t.subtasks.findIndex(s=>s.id===targetSubId);
-  if(targetIdx===-1){ t.subtasks.push(src); }
-  else{ t.subtasks.splice(zone==='top' ? targetIdx : targetIdx+1, 0, src); }
-  draggedSubtaskId = null;
-  t.updatedAt = Date.now();
-  save(); render();
-}
 
-// ── Step reordering (drawer) ──────────────────────────────────────────────────
-function handleStepDragStart(e, subId, stepId){
-  draggedStepInfo = { subId, stepId };
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', stepId);
-  e.currentTarget.classList.add('dragging');
-}
-function handleStepDragEnd(e){
-  draggedStepInfo = null;
-  document.querySelectorAll('.subtask-row.dragging,.task-subtask-row.dragging').forEach(el=>el.classList.remove('dragging'));
-  document.querySelectorAll('.subtask-row.drag-over-top,.subtask-row.drag-over-bottom,.task-subtask-row.drag-over-top,.task-subtask-row.drag-over-bottom').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom'));
-}
-function handleStepDragOver(e, subId, targetStepId){
-  if(!draggedStepInfo || draggedStepInfo.subId!==subId || draggedStepInfo.stepId===targetStepId) return;
-  e.preventDefault();
-  e.stopPropagation();
-  const row = e.currentTarget;
-  const rect = row.getBoundingClientRect();
-  const zone = (e.clientY - rect.top) / rect.height < 0.5 ? 'top' : 'bottom';
-  row.classList.remove('drag-over-top','drag-over-bottom');
-  row.classList.add(zone==='top' ? 'drag-over-top' : 'drag-over-bottom');
-}
-function handleStepDragLeave(e){
-  e.currentTarget.classList.remove('drag-over-top','drag-over-bottom');
-}
-function handleStepDrop(e, taskId, subId, targetStepId){
-  if(!draggedStepInfo || draggedStepInfo.subId!==subId || draggedStepInfo.stepId===targetStepId) return;
-  e.preventDefault();
-  e.stopPropagation();
-  const row = e.currentTarget;
-  const rect = row.getBoundingClientRect();
-  const zone = (e.clientY - rect.top) / rect.height < 0.5 ? 'top' : 'bottom';
-  row.classList.remove('drag-over-top','drag-over-bottom');
-  const t = tasks.find(x=>x.id===taskId);
-  if(!t) return;
-  const s = (t.subtasks||[]).find(x=>x.id===subId);
-  if(!s) return;
-  const srcIdx = s.subtasks.findIndex(x=>x.id===draggedStepInfo.stepId);
-  if(srcIdx===-1) return;
-  const [src] = s.subtasks.splice(srcIdx,1);
-  const targetIdx = s.subtasks.findIndex(x=>x.id===targetStepId);
-  if(targetIdx===-1){ s.subtasks.push(src); }
-  else{ s.subtasks.splice(zone==='top' ? targetIdx : targetIdx+1, 0, src); }
-  draggedStepInfo = null;
+  // Dropping a step directly onto a subtask row makes it a step of THAT subtask
+  // (not a top-level reorder) -- this is also the only way to move a step into
+  // a subtask that currently has zero steps of its own.
+  if(draggedItem.type==='step' && targetType==='subtask'){
+    const srcSub = t.subtasks.find(s=>s.id===draggedItem.subId);
+    if(!srcSub) return;
+    const srcIdx = (srcSub.subtasks||[]).findIndex(x=>x.id===draggedItem.stepId);
+    if(srcIdx===-1) return;
+    const [stepObj] = srcSub.subtasks.splice(srcIdx,1);
+    const targetSub = t.subtasks.find(s=>s.id===targetSubId);
+    if(!targetSub){ srcSub.subtasks.splice(srcIdx,0,stepObj); draggedItem=null; return; }
+    if(!Array.isArray(targetSub.subtasks)) targetSub.subtasks=[];
+    if(zone==='top') targetSub.subtasks.unshift(stepObj); else targetSub.subtasks.push(stepObj);
+    draggedItem = null;
+    t.updatedAt = Date.now();
+    save(); render();
+    return;
+  }
+
+  if(draggedItem.type==='subtask' && targetType==='step'){
+    const srcSub = t.subtasks.find(s=>s.id===draggedItem.subId);
+    if(srcSub && (srcSub.subtasks||[]).length>0){
+      showToast("This subtask has its own steps — remove or promote them first", true);
+      draggedItem = null;
+      return;
+    }
+  }
+
+  let draggedObj;
+  if(draggedItem.type==='subtask'){
+    const srcIdx = t.subtasks.findIndex(s=>s.id===draggedItem.subId);
+    if(srcIdx===-1) return;
+    draggedObj = t.subtasks.splice(srcIdx,1)[0];
+  } else {
+    const srcSub = t.subtasks.find(s=>s.id===draggedItem.subId);
+    if(!srcSub) return;
+    const srcIdx = (srcSub.subtasks||[]).findIndex(x=>x.id===draggedItem.stepId);
+    if(srcIdx===-1) return;
+    draggedObj = srcSub.subtasks.splice(srcIdx,1)[0];
+  }
+
+  if(targetType==='subtask'){
+    if(!Array.isArray(draggedObj.subtasks)) draggedObj.subtasks = [];
+    const targetIdx = t.subtasks.findIndex(s=>s.id===targetSubId);
+    const insertAt = targetIdx===-1 ? t.subtasks.length : (zone==='top' ? targetIdx : targetIdx+1);
+    t.subtasks.splice(insertAt, 0, draggedObj);
+  } else {
+    const targetSub = t.subtasks.find(s=>s.id===targetSubId);
+    if(!targetSub){
+      if(draggedItem.type==='subtask'){ t.subtasks.push(draggedObj); }
+      draggedItem = null;
+      return;
+    }
+    delete draggedObj.subtasks;
+    if(!Array.isArray(targetSub.subtasks)) targetSub.subtasks = [];
+    const targetIdx = targetSub.subtasks.findIndex(x=>x.id===targetStepId);
+    const insertAt = targetIdx===-1 ? targetSub.subtasks.length : (zone==='top' ? targetIdx : targetIdx+1);
+    targetSub.subtasks.splice(insertAt, 0, draggedObj);
+  }
+
+  draggedItem = null;
   t.updatedAt = Date.now();
   save(); render();
 }
