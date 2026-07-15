@@ -970,7 +970,7 @@ function renderList(){
             <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();deleteSubSubtask('${t.id}','${s.id}','${ss.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
           </div>
         `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
-          <input type="text" id="inlineSubtaskInput" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault(); if(event.shiftKey){outdentInlineSubtaskInput('${t.id}');}}">
+          <input type="text" id="inlineSubtaskInput" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentInlineSubtaskInput('${t.id}');}">
         </div>`:''}</div>`:''}
       `).join('')}${inlineAddSubtaskTaskId===t.id && !inlineAddParentSubId?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
         <input type="text" id="inlineSubtaskInput" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentInlineSubtaskInput('${t.id}');}}">
@@ -1018,14 +1018,16 @@ function boardCardHtml(t){
           : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','board')">${highlightMatch(s.text, searchQuery)}</span>`}
         ${(s.subtasks||[]).length>0?`<button class="icon-btn subtask-toggle" onclick="event.stopPropagation();toggleSubCollapse('${s.id}');this.blur()" title="${collapsedSubIds.has(s.id)?'Expand':'Collapse'} steps"><i class="fa-solid fa-chevron-${collapsedSubIds.has(s.id)?'right':'down'}"></i></button>`:''}
       </div>
-      ${((s.subtasks||[]).length>0 && !collapsedSubIds.has(s.id))?`<div class="task-subtasks" style="margin-left:21px">${s.subtasks.map(ss=>`
+      ${(((s.subtasks||[]).length>0 && !collapsedSubIds.has(s.id))||(inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id))?`<div class="task-subtasks" style="margin-left:21px">${s.subtasks.map(ss=>`
         <div class="task-subtask-row ${ss.done?'done':''}">
           <div class="mini-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
           <span onclick="event.stopPropagation()">${highlightMatch(ss.text, searchQuery)}</span>
         </div>
-      `).join('')}</div>`:''}
-    `).join('')}${inlineAddSubtaskTaskId===t.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
-      <input type="text" id="inlineSubtaskInputBoard" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault();}">
+      `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
+        <input type="text" id="inlineSubtaskInputBoard" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentInlineSubtaskInput('${t.id}');}">
+      </div>`:''}</div>`:''}
+    `).join('')}${inlineAddSubtaskTaskId===t.id && !inlineAddParentSubId?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
+      <input type="text" id="inlineSubtaskInputBoard" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentInlineSubtaskInput('${t.id}');}}">
     </div>`:''}</div>`:''}
     <div class="board-card-meta">
       <span class="badge-project"><i class="fa-solid fa-${proj?(proj.icon||'folder'):'folder'} picon"></i><span class="pname-text">${esc(proj?proj.name:'')}</span></span>
@@ -1101,6 +1103,7 @@ function handleBoardKeyNav(e){
     e.preventDefault();
     if(colIdx===-1) return;
     inlineAddSubtaskTaskId = kbdSelectedTaskId;
+    inlineAddParentSubId = null;
     renderBoard();
     document.getElementById('inlineSubtaskInputBoard')?.focus();
     return;
@@ -1437,7 +1440,7 @@ function renderDrawer(){
               </div>
             `).join('')}
             <div class="task-subtask-add-row">
-              <input type="text" id="newSubSubtaskInput-${s.id}" placeholder="Add a step + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault(); if(event.shiftKey){outdentDrawerSubtaskInput('${t.id}','${s.id}');}}">
+              <input type="text" id="newSubSubtaskInput-${s.id}" placeholder="Add a step + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentDrawerSubtaskInput('${t.id}','${s.id}');}">
             </div>
           </div>
           ` : ''}
@@ -2272,8 +2275,9 @@ function addInlineSubtask(taskId){
   document.getElementById(inputId)?.focus();
 }
 function indentInlineSubtaskInput(taskId){
+  const inputId = viewMode==='board' ? 'inlineSubtaskInputBoard' : 'inlineSubtaskInput';
   const t = tasks.find(x=>x.id===taskId); if(!t) return;
-  const input = document.getElementById('inlineSubtaskInput');
+  const input = document.getElementById(inputId);
   const val = input ? input.value.trim() : '';
   let carryOverText = val;
   if(!t.subtasks.length){
@@ -2285,20 +2289,22 @@ function indentInlineSubtaskInput(taskId){
   }
   inlineAddParentSubId = t.subtasks[t.subtasks.length-1].id;
   collapsedSubIds.delete(inlineAddParentSubId);
-  renderList();
-  const newInput = document.getElementById('inlineSubtaskInput');
+  render();
+  const newInput = document.getElementById(inputId);
   if(newInput){ newInput.value = carryOverText; newInput.focus(); }
 }
 function outdentInlineSubtaskInput(taskId){
-  const input = document.getElementById('inlineSubtaskInput');
+  const inputId = viewMode==='board' ? 'inlineSubtaskInputBoard' : 'inlineSubtaskInput';
+  const input = document.getElementById(inputId);
   const val = input ? input.value : '';
   inlineAddParentSubId = null;
-  renderList();
-  const newInput = document.getElementById('inlineSubtaskInput');
+  render();
+  const newInput = document.getElementById(inputId);
   if(newInput){ newInput.value = val; newInput.focus(); }
 }
 function addInlineSubSubtask(taskId, subId){
-  const input = document.getElementById('inlineSubtaskInput');
+  const inputId = viewMode==='board' ? 'inlineSubtaskInputBoard' : 'inlineSubtaskInput';
+  const input = document.getElementById(inputId);
   if(!input) return;
   const text = input.value.trim();
   if(!text) return;
@@ -2308,7 +2314,7 @@ function addInlineSubSubtask(taskId, subId){
   s.subtasks.push({id:genId(), text, done:false});
   t.updatedAt = Date.now();
   save(); render();
-  document.getElementById('inlineSubtaskInput')?.focus();
+  document.getElementById(inputId)?.focus();
 }
 function handleListKeyNav(e){
   if(e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter' && e.key!==' ' && e.key!=='Tab' && e.key!=='Delete') return;
