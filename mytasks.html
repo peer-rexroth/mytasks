@@ -1026,7 +1026,7 @@ function boardCardHtml(t){
       <input type="text" id="inlineSubtaskInputBoard" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault();}">
     </div>`:''}</div>`:''}
     <div class="board-card-meta">
-      <span class="badge-project"${proj?` data-tooltip="${esc(proj.name)}"`:''}><i class="fa-solid fa-${proj?(proj.icon||'folder'):'folder'} picon"></i><span class="pname-text">${esc(proj?proj.name:'')}</span></span>
+      <span class="badge-project"><i class="fa-solid fa-${proj?(proj.icon||'folder'):'folder'} picon"></i><span class="pname-text">${esc(proj?proj.name:'')}</span></span>
     </div>
   </div>`;
 }
