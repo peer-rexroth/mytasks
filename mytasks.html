@@ -956,6 +956,7 @@ function renderList(){
             ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputList" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
             : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','list')">${highlightMatch(s.text, searchQuery)}</span>`}
           <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();demoteSubtaskToStep('${t.id}','${s.id}')" title="Make this a step of the subtask above"><i class="fa-solid fa-indent"></i></button>
+          <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();deleteSubtask('${t.id}','${s.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
         </div>
         ${(((s.subtasks||[]).length>0 && !collapsedSubIds.has(s.id))||(inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id))?`<div class="task-subtasks" style="margin-left:21px">${(s.subtasks||[]).map(ss=>`
           <div class="task-subtask-row ${ss.done?'done':''}" draggable="true"
@@ -966,6 +967,7 @@ function renderList(){
               ? `<input type="text" class="task-subtask-text-input" id="renameSubSubtaskInputList" value="${esc(ss.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
               : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubSubtask('${t.id}','${s.id}','${ss.id}','list')">${highlightMatch(ss.text, searchQuery)}</span>`}
             <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();promoteStepToSubtask('${t.id}','${s.id}','${ss.id}')" title="Make this its own subtask"><i class="fa-solid fa-outdent"></i></button>
+            <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();deleteSubSubtask('${t.id}','${s.id}','${ss.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
           </div>
         `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
           <input type="text" id="inlineSubtaskInput" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault(); if(event.shiftKey){outdentInlineSubtaskInput('${t.id}');}}">
