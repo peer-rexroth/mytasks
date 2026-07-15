@@ -212,6 +212,8 @@
   .task-subtasks { grid-area: sub; display: flex; flex-direction: column; gap: 4px; }
   .task-subtask-row { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-2); position: relative; }
   .task-subtask-row .subtask-toggle { position: absolute; left: -20px; top: 50%; transform: translateY(-50%); }
+  .sub-hierarchy-btn { opacity: 0; flex-shrink: 0; font-size: 10px; padding: 2px 4px; }
+  .task-subtask-row:hover .sub-hierarchy-btn { opacity: 1; }
   .task-subtask-row .mini-check { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg-2); transition: background-color .15s, border-color .15s; }
   .task-subtask-row .mini-check:hover { border-color: var(--green-text); }
   .task-subtask-row .mini-check.checked { background: var(--green-text); border-color: var(--green-text); }
@@ -948,6 +950,7 @@ function renderList(){
           ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
             ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputList" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
             : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','list')">${highlightMatch(s.text, searchQuery)}</span>`}
+          <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();demoteSubtaskToStep('${t.id}','${s.id}')" title="Make this a step of the subtask above"><i class="fa-solid fa-indent"></i></button>
         </div>
         ${(((s.subtasks||[]).length>0 && !collapsedSubIds.has(s.id))||(inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id))?`<div class="task-subtasks" style="margin-left:21px">${(s.subtasks||[]).map(ss=>`
           <div class="task-subtask-row ${ss.done?'done':''}" draggable="true"
@@ -957,6 +960,7 @@ function renderList(){
             ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
               ? `<input type="text" class="task-subtask-text-input" id="renameSubSubtaskInputList" value="${esc(ss.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
               : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubSubtask('${t.id}','${s.id}','${ss.id}','list')">${highlightMatch(ss.text, searchQuery)}</span>`}
+            <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();promoteStepToSubtask('${t.id}','${s.id}','${ss.id}')" title="Make this its own subtask"><i class="fa-solid fa-outdent"></i></button>
           </div>
         `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
           <input type="text" id="inlineSubtaskInput" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault(); if(event.shiftKey){outdentInlineSubtaskInput('${t.id}');}}">
@@ -1387,6 +1391,7 @@ function renderDrawer(){
               ? `<input type="text" class="sub-text-input" id="renameSubtaskInputDrawer" value="${esc(s.text)}" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
               : `<div class="sub-text" ondblclick="startRenameSubtask('${t.id}','${s.id}','drawer')">${esc(s.text)}</div>`}
             <button class="icon-btn sub-step-toggle" onclick="toggleDrawerStepsPanel('${s.id}');this.blur()" title="${stepsOpen?'Hide':(stepCount>0?'Show':'Add')} steps"><i class="fa-solid fa-${toggleIcon}"></i></button>
+            <button class="icon-btn" onclick="demoteSubtaskToStep('${t.id}','${s.id}')" title="Make this a step of the subtask above"><i class="fa-solid fa-indent"></i></button>
             <button class="icon-btn sub-del" onclick="deleteSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-trash"></i></button>
           </div>
           ${stepsOpen ? `
@@ -1400,6 +1405,7 @@ function renderDrawer(){
                 ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
                   ? `<input type="text" class="sub-text-input" id="renameSubSubtaskInputDrawer" value="${esc(ss.text)}" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
                   : `<div class="sub-text" ondblclick="startRenameSubSubtask('${t.id}','${s.id}','${ss.id}','drawer')">${esc(ss.text)}</div>`}
+                <button class="icon-btn" onclick="promoteStepToSubtask('${t.id}','${s.id}','${ss.id}')" title="Make this its own subtask"><i class="fa-solid fa-outdent"></i></button>
                 <button class="icon-btn sub-del" onclick="deleteSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-trash"></i></button>
               </div>
             `).join('')}
@@ -2058,6 +2064,32 @@ function outdentDrawerSubtaskInput(taskId, subId){
   renderDrawer();
   const newInput = document.getElementById('newSubtaskInput');
   if(newInput){ newInput.value = val; newInput.focus(); }
+}
+function promoteStepToSubtask(taskId, subId, stepId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const idx = (s.subtasks||[]).findIndex(x=>x.id===stepId);
+  if(idx===-1) return;
+  const [step] = s.subtasks.splice(idx,1);
+  step.subtasks = [];
+  const parentIdx = t.subtasks.findIndex(x=>x.id===subId);
+  t.subtasks.splice(parentIdx+1, 0, step);
+  t.updatedAt = Date.now();
+  save(); render();
+}
+function demoteSubtaskToStep(taskId, subId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const idx = t.subtasks.findIndex(x=>x.id===subId);
+  if(idx<=0){ showToast("Move this below another subtask first", true); return; }
+  const s = t.subtasks[idx];
+  if((s.subtasks||[]).length>0){ showToast("This subtask has its own steps — remove or promote them first", true); return; }
+  const prevSub = t.subtasks[idx-1];
+  t.subtasks.splice(idx,1);
+  if(!Array.isArray(prevSub.subtasks)) prevSub.subtasks=[];
+  prevSub.subtasks.push(s);
+  drawerExpandedSubIds.add(prevSub.id);
+  t.updatedAt = Date.now();
+  save(); render();
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────────
