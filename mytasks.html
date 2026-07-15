@@ -493,7 +493,8 @@
     <h3>Keyboard shortcuts</h3>
     <div class="shortcuts-list">
       <div class="shortcut-row"><span>Navigate tasks</span><span class="kbd-group"><kbd>&uarr;</kbd><kbd>&darr;</kbd></span></div>
-      <div class="shortcut-row"><span>Open selected task</span><span class="kbd-group"><kbd>Enter</kbd> / <kbd>Space</kbd></span></div>
+      <div class="shortcut-row"><span>Open selected task</span><span class="kbd-group"><kbd>Enter</kbd></span></div>
+      <div class="shortcut-row"><span>Collapse/expand selected task (list view)</span><span class="kbd-group"><kbd>Space</kbd></span></div>
       <div class="shortcut-row"><span>Add subtask to selected task</span><span class="kbd-group"><kbd>Tab</kbd></span></div>
       <div class="shortcut-row"><span>Delete selected task</span><span class="kbd-group"><kbd>Delete</kbd></span></div>
       <div class="shortcut-row"><span>Undo last delete or edit</span><span class="kbd-group"><kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd></span></div>
@@ -1765,6 +1766,27 @@ function toggleTaskCollapse(taskId){
   }
   renderList();
 }
+function toggleTaskCollapseDeep(taskId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const subtasksWithSteps = (t.subtasks||[]).filter(s=>(s.subtasks||[]).length>0);
+  const taskCollapsed = collapsedTaskIds.has(taskId);
+  const stepsFullyExpanded = subtasksWithSteps.every(s=>!collapsedSubIds.has(s.id));
+
+  if(taskCollapsed){
+    // collapsed -> subtasks visible, steps still collapsed
+    collapsedTaskIds.delete(taskId);
+    subtasksWithSteps.forEach(s=>collapsedSubIds.add(s.id));
+  } else if(!stepsFullyExpanded){
+    // subtasks visible -> also expand their steps
+    subtasksWithSteps.forEach(s=>collapsedSubIds.delete(s.id));
+  } else {
+    // everything expanded -> collapse back down (pre-collapsing steps so the next expand starts at "subtasks only" again)
+    collapsedTaskIds.add(taskId);
+    subtasksWithSteps.forEach(s=>collapsedSubIds.add(s.id));
+    if(inlineAddSubtaskTaskId===taskId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; }
+  }
+  renderList();
+}
 function toggleSubCollapse(subId){
   if(collapsedSubIds.has(subId)){
     collapsedSubIds.delete(subId);
@@ -2135,10 +2157,20 @@ function handleListKeyNav(e){
     document.getElementById('inlineSubtaskInput')?.focus();
     return;
   }
-  if(e.key==='Enter' || e.key===' '){
+  if(e.key==='Enter'){
     if(kbdSelectedTaskId && list.some(t=>t.id===kbdSelectedTaskId)){
       e.preventDefault();
       openTask(kbdSelectedTaskId);
+    }
+    return;
+  }
+  if(e.key===' '){
+    e.preventDefault();
+    if(kbdSelectedTaskId && list.some(t=>t.id===kbdSelectedTaskId)){
+      const t = tasks.find(x=>x.id===kbdSelectedTaskId);
+      if(t && (t.subtasks||[]).length>0) toggleTaskCollapseDeep(kbdSelectedTaskId);
+    } else {
+      toggleCollapseAllTasks();
     }
     return;
   }
