@@ -143,7 +143,7 @@
   .view-switch-btn.active { background: var(--bg-3); color: var(--text); }
 
   .board { display: flex; gap: 14px; padding: 4px 20px 20px; overflow-x: auto; flex: 1; align-items: flex-start; }
-  .board-col { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); width: 300px; flex-shrink: 0; display: flex; flex-direction: column; max-height: 100%; }
+  .board-col { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); width: 320px; flex-shrink: 0; display: flex; flex-direction: column; max-height: 100%; }
   .board-col.drag-over { border-color: var(--blue-border); box-shadow: inset 0 0 0 1px var(--blue-border); }
   .board-col-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 0.5px solid var(--border); font-size: 12px; font-weight: 600; flex-shrink: 0; }
   .board-col-header .count { font-size: 11px; color: var(--text-3); font-weight: 500; }
@@ -211,7 +211,7 @@
 
   .task-subtasks { grid-area: sub; display: flex; flex-direction: column; gap: 4px; }
   .task-subtask-row { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-2); position: relative; }
-  .task-subtask-row .subtask-toggle { position: absolute; left: -20px; top: 50%; transform: translateY(-50%); }
+  #taskList .task-subtask-row .subtask-toggle { position: absolute; left: -20px; top: 50%; transform: translateY(-50%); }
   .sub-hierarchy-btn { opacity: 0; flex-shrink: 0; font-size: 10px; padding: 2px 4px; }
   .task-subtask-row:hover .sub-hierarchy-btn { opacity: 1; }
   .task-subtask-row .mini-check { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--border-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--bg-2); transition: background-color .15s, border-color .15s; }
@@ -220,7 +220,7 @@
   .task-subtask-row .mini-check i { font-size: 7px; color: #fff; opacity: 0; }
   .task-subtask-row .mini-check.checked i { opacity: 1; }
   .task-subtask-row.done { text-decoration: line-through; color: var(--text-3); }
-  .task-subtask-row span { cursor: text; }
+  .task-subtask-row span { cursor: text; flex: 1; }
   .task-subtask-text-input { flex: 1; font-size: 13px; font-family: var(--font); border: 0.5px solid var(--border-2); border-radius: 4px; padding: 1px 5px; background: var(--bg); color: var(--text); outline: none; min-width: 60px; }
   .task-subtask-add-row { margin-top: 2px; }
   .task-subtask-add-row input { width: 100%; border: 0.5px dashed var(--border-2); border-radius: var(--radius); padding: 4px 8px; font-size: 13px; background: var(--bg); color: var(--text); outline: none; font-family: var(--font); cursor: text; }
@@ -981,6 +981,7 @@ function renderList(){
 // ── Board view ────────────────────────────────────────────────────────────────
 function boardCardHtml(t){
   const proj = projById(t.projectId);
+  const subTotal = (t.subtasks||[]).length;
   let dueBadge = '';
   if(t.dueDate){
     const overdue = isOverdue(t);
@@ -1001,13 +1002,20 @@ function boardCardHtml(t){
       ${priorityIcon}
       ${dueBadge}
     </div>
-    ${((t.subtasks||[]).length>0||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks" style="margin-left:2px">${t.subtasks.map(s=>`
+    ${(subTotal>0||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks" style="margin-left:2px">${t.subtasks.map(s=>`
       <div class="task-subtask-row ${s.done?'done':''}">
         <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
         ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
           ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputBoard" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
           : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','board')">${highlightMatch(s.text, searchQuery)}</span>`}
+        ${(s.subtasks||[]).length>0?`<button class="icon-btn subtask-toggle" onclick="event.stopPropagation();toggleSubCollapse('${s.id}');this.blur()" title="${collapsedSubIds.has(s.id)?'Expand':'Collapse'} steps"><i class="fa-solid fa-chevron-${collapsedSubIds.has(s.id)?'right':'down'}"></i></button>`:''}
       </div>
+      ${((s.subtasks||[]).length>0 && !collapsedSubIds.has(s.id))?`<div class="task-subtasks" style="margin-left:21px">${s.subtasks.map(ss=>`
+        <div class="task-subtask-row ${ss.done?'done':''}">
+          <div class="mini-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
+          <span onclick="event.stopPropagation()">${highlightMatch(ss.text, searchQuery)}</span>
+        </div>
+      `).join('')}</div>`:''}
     `).join('')}${inlineAddSubtaskTaskId===t.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
       <input type="text" id="inlineSubtaskInputBoard" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault();}">
     </div>`:''}</div>`:''}
@@ -1789,7 +1797,7 @@ function toggleTaskCollapse(taskId){
     collapsedTaskIds.add(taskId);
     if(inlineAddSubtaskTaskId===taskId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; }
   }
-  renderList();
+  render();
 }
 function toggleTaskCollapseDeep(taskId){
   const t = tasks.find(x=>x.id===taskId); if(!t) return;
@@ -1819,7 +1827,7 @@ function toggleSubCollapse(subId){
     collapsedSubIds.add(subId);
     if(inlineAddParentSubId===subId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; }
   }
-  renderList();
+  render();
 }
 function toggleCollapseAllTasks(){
   const list = getFilteredSortedTasks();
