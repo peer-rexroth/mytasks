@@ -1113,7 +1113,12 @@ function handleBoardKeyNav(e){
   }
   if(e.key===' '){
     e.preventDefault();
-    toggleCollapseAllTasks();
+    if(colIdx!==-1){
+      const t = columns[colIdx].tasks[rowIdx];
+      if((t.subtasks||[]).length>0) toggleTaskCollapseDeep(t.id);
+    } else {
+      toggleCollapseAllTasks();
+    }
     return;
   }
 
@@ -1830,7 +1835,7 @@ function toggleTaskCollapseDeep(taskId){
     subtasksWithSteps.forEach(s=>collapsedSubIds.add(s.id));
     if(inlineAddSubtaskTaskId===taskId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; }
   }
-  renderList();
+  render();
 }
 function toggleSubCollapse(subId){
   if(collapsedSubIds.has(subId)){
