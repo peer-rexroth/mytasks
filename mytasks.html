@@ -997,7 +997,7 @@ function boardCardHtml(t){
   const priorityIcon = t.priority==='high' ? `<i class="fa-solid fa-flag board-card-priority-icon" title="High priority"></i>` : '';
   return `<div class="board-card ${t.status==='done'?'done':''} ${t.id===kbdSelectedTaskId?'kbd-selected':''}" data-id="${t.id}" draggable="true"
       ondragstart="handleCardDragStart(event,'${t.id}')" ondragend="handleCardDragEnd(event)"
-      onclick="selectBoardCard('${t.id}')" ondblclick="openTask('${t.id}')">
+      onmousedown="selectBoardCard('${t.id}')" ondblclick="openTask('${t.id}')">
     ${tagStrips?`<div class="board-card-tagstrips">${tagStrips}</div>`:''}
     <div class="board-card-top">
       <div class="task-checkbox ${t.status==='done'?'checked':''} ${t.id===justCompletedTaskId?'pop':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
