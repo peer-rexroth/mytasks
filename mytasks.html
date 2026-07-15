@@ -275,7 +275,6 @@
   .subtask-row.done .sub-text { text-decoration: line-through; color: var(--text-3); }
   .subtask-row .sub-text-input { flex: 1; font-size: 13px; font-family: var(--font); border: 0.5px solid var(--border-2); border-radius: 4px; padding: 2px 6px; background: var(--bg-2); color: var(--text); outline: none; min-width: 60px; }
   .sub-step-toggle { flex-shrink: 0; font-size: 11px; padding: 3px 5px; }
-  .step-count-hint { margin-left: 14px; font-size: 11px; color: var(--text-3); }
   .subtask-row .sub-del { opacity: 0; }
   .subtask-row:hover .sub-del { opacity: 1; }
   .subtask-progress { font-size: 11px; color: var(--text-3); margin-bottom: 2px; }
@@ -1387,7 +1386,7 @@ function renderDrawer(){
             <button class="icon-btn sub-del" onclick="deleteSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-trash"></i></button>
           </div>
           ${stepsOpen ? `
-          <div class="task-subtasks" style="margin-left:14px">
+          <div class="task-subtasks" style="margin-left:24px">
             ${(s.subtasks||[]).map(ss=>`
               <div class="subtask-row ${ss.done?'done':''}" draggable="true"
                 ondragstart="handleStepDragStart(event,'${s.id}','${ss.id}')" ondragend="handleStepDragEnd(event)"
@@ -1404,7 +1403,7 @@ function renderDrawer(){
               <input type="text" id="newSubSubtaskInput-${s.id}" placeholder="Add a step + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault(); if(event.shiftKey){outdentDrawerSubtaskInput('${t.id}','${s.id}');}}">
             </div>
           </div>
-          ` : (stepCount>0 ? `<div class="step-count-hint">${stepCount} step${stepCount===1?'':'s'}</div>` : '')}
+          ` : ''}
         `;}).join('')}
         <div class="add-row">
           <input type="text" id="newSubtaskInput" placeholder="Add subtask + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentDrawerSubtaskInput('${t.id}');}}">
