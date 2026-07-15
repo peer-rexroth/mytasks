@@ -412,6 +412,7 @@
     <div class="main-toolbar">
       <div class="main-title" id="mainTitle">All Tasks</div>
       <div class="main-toolbar-right">
+        <button class="btn btn-icon btn-sm" id="collapseAllBtnBoard" onclick="toggleCollapseAllTasks();this.blur()" title="Collapse/expand all subtasks" style="display:none"><i class="fa-solid fa-angles-down" id="collapseAllIconBoard"></i></button>
         <div class="view-switch" id="viewSwitch">
           <button class="view-switch-btn" data-view="list" onclick="setViewMode('list')" title="List view"><i class="fa-solid fa-list"></i></button>
           <button class="view-switch-btn" data-view="board" onclick="setViewMode('board')" title="Board view"><i class="fa-solid fa-table-columns"></i></button>
@@ -801,6 +802,8 @@ function updateViewModeUI(){
   const board = document.getElementById('board');
   if(listWrap) listWrap.style.display = viewMode==='board' ? 'none' : '';
   if(board) board.style.display = viewMode==='board' ? '' : 'none';
+  const collapseAllBtnBoard = document.getElementById('collapseAllBtnBoard');
+  if(collapseAllBtnBoard) collapseAllBtnBoard.style.display = viewMode==='board' ? '' : 'none';
   document.querySelectorAll('.view-switch-btn').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.view===viewMode);
   });
@@ -1003,8 +1006,9 @@ function boardCardHtml(t){
         : `<div class="board-card-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${highlightMatch(t.title, searchQuery)}</div>`}
       ${priorityIcon}
       ${dueBadge}
+      ${subTotal>0?`<button class="icon-btn subtask-toggle" onclick="event.stopPropagation();toggleTaskCollapse('${t.id}');this.blur()" title="${collapsedTaskIds.has(t.id)?'Expand':'Collapse'} subtasks"><i class="fa-solid fa-chevron-${collapsedTaskIds.has(t.id)?'right':'down'}"></i></button>`:''}
     </div>
-    ${(subTotal>0||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks" style="margin-left:2px">${t.subtasks.map(s=>`
+    ${((subTotal>0 && !collapsedTaskIds.has(t.id))||inlineAddSubtaskTaskId===t.id)?`<div class="task-subtasks" style="margin-left:2px">${t.subtasks.map(s=>`
       <div class="task-subtask-row ${s.done?'done':''}">
         <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
         ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
@@ -1044,6 +1048,7 @@ function renderBoard(){
       </div>
     </div>`;
   }).join('');
+  updateCollapseAllIcon();
 }
 function handleCardDragStart(e, id){
   draggingTaskId = id;
@@ -1099,11 +1104,16 @@ function handleBoardKeyNav(e){
     return;
   }
 
-  if(e.key==='Enter' || e.key===' '){
+  if(e.key==='Enter'){
     if(colIdx!==-1){
       e.preventDefault();
       openTask(columns[colIdx].tasks[rowIdx].id);
     }
+    return;
+  }
+  if(e.key===' '){
+    e.preventDefault();
+    toggleCollapseAllTasks();
     return;
   }
 
@@ -1831,8 +1841,11 @@ function toggleSubCollapse(subId){
   }
   render();
 }
+function getVisibleTasksForCollapse(){
+  return viewMode==='board' ? tasks.filter(t=>taskMatchesFilters(t, {ignoreStatus:true})) : getFilteredSortedTasks();
+}
 function toggleCollapseAllTasks(){
-  const list = getFilteredSortedTasks();
+  const list = getVisibleTasksForCollapse();
   const anyExpanded = list.some(t=>(t.subtasks||[]).length>0 && !collapsedTaskIds.has(t.id));
   list.forEach(t=>{
     if((t.subtasks||[]).length===0) return;
@@ -1842,14 +1855,16 @@ function toggleCollapseAllTasks(){
       if(anyExpanded) collapsedSubIds.add(s.id); else collapsedSubIds.delete(s.id);
     });
   });
-  renderList();
+  render();
 }
 function updateCollapseAllIcon(){
-  const icon = document.getElementById('collapseAllIcon');
-  if(!icon) return;
-  const list = getFilteredSortedTasks();
+  const list = getVisibleTasksForCollapse();
   const anyExpanded = list.some(t=>(t.subtasks||[]).length>0 && !collapsedTaskIds.has(t.id));
-  icon.className = anyExpanded ? 'fa-solid fa-angles-down' : 'fa-solid fa-angles-up';
+  const cls = anyExpanded ? 'fa-solid fa-angles-down' : 'fa-solid fa-angles-up';
+  const icon = document.getElementById('collapseAllIcon');
+  if(icon) icon.className = cls;
+  const iconBoard = document.getElementById('collapseAllIconBoard');
+  if(iconBoard) iconBoard.className = cls;
 }
 // ── Project CRUD ──────────────────────────────────────────────────────────────
 function openProjectModal(id){
