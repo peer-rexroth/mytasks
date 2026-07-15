@@ -2220,6 +2220,21 @@ document.addEventListener('keydown', e=>{
     if(el && (el.id==='quickAddInput' || el.id==='searchInput')) el.blur();
     return;
   }
+  if(e.key==='Tab' && activeTaskId && !document.querySelector('.modal-bg.open')){
+    const drawer = document.getElementById('drawer');
+    const focusables = drawer ? Array.from(drawer.querySelectorAll('input, textarea, select, button, [tabindex]')).filter(el=>!el.disabled && el.tabIndex!==-1 && el.offsetParent!==null) : [];
+    if(focusables.length){
+      const first = focusables[0], last = focusables[focusables.length-1];
+      const current = document.activeElement;
+      const inDrawer = drawer.contains(current);
+      if(e.shiftKey){
+        if(!inDrawer || current===first){ e.preventDefault(); last.focus(); }
+      } else {
+        if(!inDrawer || current===last){ e.preventDefault(); first.focus(); }
+      }
+    }
+    return;
+  }
   if(e.key==='Enter' || e.key===' '){
     const el = document.activeElement;
     const activeRole = el && el.getAttribute && el.getAttribute('role');
