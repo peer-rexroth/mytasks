@@ -134,7 +134,8 @@
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
   .main-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 4px; }
   .main-title { font-size: 19px; font-weight: 600; }
-  .main-toolbar-right { display: flex; align-items: center; gap: 8px; }
+  .main-toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .toolbar-filter-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
   .main-toolbar select { font-size: 12px; border: 0.5px solid var(--border-2); border-radius: var(--radius); padding: 5px 8px; background: var(--bg); color: var(--text); font-family: var(--font); }
 
   .view-switch { display: inline-flex; border: 0.5px solid var(--border-2); border-radius: var(--radius); overflow: hidden; }
@@ -390,14 +391,6 @@
       </div>
     </div>
     <div class="sidebar-section">
-      <div class="sidebar-section-label">Status</div>
-      <div class="filter-chips" id="statusChips"></div>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-section-label">Priority</div>
-      <div class="filter-chips" id="priorityChips"></div>
-    </div>
-    <div class="sidebar-section">
       <div class="sidebar-section-label">Tags</div>
       <div class="filter-chips" id="tagChips"></div>
     </div>
@@ -413,6 +406,12 @@
       <div class="main-title" id="mainTitle">All Tasks</div>
       <div class="main-toolbar-right">
         <button class="btn btn-icon btn-sm" id="collapseAllBtnBoard" onclick="toggleCollapseAllTasks();this.blur()" title="Collapse/expand all subtasks" style="display:none"><i class="fa-solid fa-angles-down" id="collapseAllIconBoard"></i></button>
+        <span class="toolbar-filter-label">Status</span>
+        <div class="filter-chips" id="statusChips"></div>
+        <div class="topbar-divider"></div>
+        <span class="toolbar-filter-label">Priority</span>
+        <div class="filter-chips" id="priorityChips"></div>
+        <div class="topbar-divider"></div>
         <div class="view-switch" id="viewSwitch">
           <button class="view-switch-btn" data-view="list" onclick="setViewMode('list')" title="List view"><i class="fa-solid fa-list"></i></button>
           <button class="view-switch-btn" data-view="board" onclick="setViewMode('board')" title="Board view"><i class="fa-solid fa-table-columns"></i></button>
