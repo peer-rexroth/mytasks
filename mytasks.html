@@ -147,6 +147,7 @@
   .board { display: flex; gap: 14px; padding: 4px 20px 20px; overflow-x: auto; flex: 1; align-items: flex-start; }
   .board-col { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); width: 320px; flex-shrink: 0; display: flex; flex-direction: column; max-height: 100%; }
   .board-col.drag-over { border-color: var(--blue-border); box-shadow: inset 0 0 0 1px var(--blue-border); }
+  .board-col.dimmed { opacity: 0.45; }
   .board-col-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 0.5px solid var(--border); font-size: 12px; font-weight: 600; flex-shrink: 0; }
   .board-col-header .count { font-size: 11px; color: var(--text-3); font-weight: 500; }
   .board-col-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; min-height: 40px; }
@@ -1041,7 +1042,8 @@ function renderBoard(){
   const columns = getBoardColumns();
   board.innerHTML = columns.map(col=>{
     const p = col.project, colTasks = col.tasks;
-    return `<div class="board-col" data-project="${p.id}" ondragover="handleBoardDragOver(event,'${p.id}')" ondragleave="handleBoardDragLeave(event)" ondrop="handleBoardDrop(event,'${p.id}')">
+    const dimmed = filterProjectId && filterProjectId!==p.id;
+    return `<div class="board-col${dimmed?' dimmed':''}" data-project="${p.id}" ondragover="handleBoardDragOver(event,'${p.id}')" ondragleave="handleBoardDragLeave(event)" ondrop="handleBoardDrop(event,'${p.id}')">
       <div class="board-col-header"><span><i class="fa-solid fa-${p.icon||'folder'} picon"></i> ${esc(p.name)}</span><span class="count">${colTasks.length}</span></div>
       <div class="board-col-body">
         ${colTasks.length===0 ? `<div class="board-empty">No tasks</div>` : colTasks.map(t=>boardCardHtml(t)).join('')}
