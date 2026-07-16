@@ -88,6 +88,17 @@ There are three surfaces that can show a task's subtasks/steps, and they are
   height is also a real constraint (kanban columns want roughly uniform
   card heights), which is why steps collapse by default there.
 
+  Board columns are **projects**, not status (`getBoardColumns()` maps over
+  `projects`, one column each). Status is a per-card badge instead, and
+  dragging a card to a different column sets `projectId` (`handleBoardDrop`),
+  not `status`. `taskMatchesFilters(t, opts)` has both `opts.ignoreProject`
+  and `opts.ignoreStatus` for this reason: whichever field is the current
+  grouping axis gets ignored by the filter (so selecting it in the sidebar/
+  toolbar can't collapse the board down to one column), while the *other*
+  one still filters within columns normally. Board view passes
+  `{ignoreProject:true}`; list view passes no opts (both filters fully
+  apply there).
+
 When adding a subtask/step feature, decide deliberately whether it belongs in
 all three surfaces or just list view + drawer — don't assume parity.
 
@@ -131,6 +142,16 @@ card with no way back.
   focus ring doesn't reappear on the next keypress.
 - `button:focus:not(:focus-visible) { outline: none; }` is global — focus
   rings only show for real keyboard navigation, not post-click.
+- Custom checkboxes are `<div role="checkbox" tabindex="0">`, not real
+  `<input>`s, so there's an accessibility "echo" in the global keydown
+  handler: if a `role="checkbox"`/`role="button"` div has focus, Space/Enter
+  re-clicks it. That block runs *before* `handleListKeyNav`/
+  `handleBoardKeyNav`, so it silently swallows Space/Enter whenever a
+  checkbox happens to still be focused from a prior click — which is the
+  normal case, since clicking a `tabindex="0"` div focuses it. The global
+  click listener blurs `[role="checkbox"]` elements (alongside `<button>`s)
+  specifically to prevent this; don't remove that without re-checking
+  Space-to-collapse and Enter-to-open still work in list/board view.
 - Commit messages in this repo tend to explain *why*, and call out when a
   fix was verified by execution (not just by reading), since that's the
   actual verification method available here.

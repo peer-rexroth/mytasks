@@ -163,8 +163,6 @@
   .board-card-title { font-size: 13px; font-weight: 500; flex: 1; word-break: break-word; }
   .board-card.done .board-card-title { text-decoration: line-through; color: var(--text-3); }
   .board-card-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-  .board-card-meta .badge-project { width: 100%; }
-  .board-card-meta .badge-project .pname-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .quickadd { display: flex; align-items: center; gap: 8px; margin: 12px 20px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 2px; }
   .quickadd i { color: var(--text-3); margin-left: 10px; font-size: 13px; }
@@ -880,7 +878,7 @@ const sortComparators = {
 
 function taskMatchesFilters(t, opts){
   opts = opts || {};
-  if(filterProjectId && t.projectId!==filterProjectId) return false;
+  if(!opts.ignoreProject && filterProjectId && t.projectId!==filterProjectId) return false;
   if(myDayFilter && t.dueDate!==todayStr()) return false;
   if(thisWeekFilter && !isThisWeek(t.dueDate)) return false;
   if(overdueFilter && !isOverdue(t)) return false;
@@ -986,7 +984,6 @@ function renderList(){
 
 // ── Board view ────────────────────────────────────────────────────────────────
 function boardCardHtml(t){
-  const proj = projById(t.projectId);
   const subTotal = (t.subtasks||[]).length;
   let dueBadge = '';
   if(t.dueDate){
@@ -1029,23 +1026,23 @@ function boardCardHtml(t){
       <input type="text" id="inlineSubtaskInputBoard" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentInlineSubtaskInput('${t.id}');}}">
     </div>`:''}</div>`:''}
     <div class="board-card-meta">
-      <span class="badge-project"><i class="fa-solid fa-${proj?(proj.icon||'folder'):'folder'} picon"></i><span class="pname-text">${esc(proj?proj.name:'')}</span></span>
+      <span class="badge badge-status-${t.status}">${statusLabel(t.status)}</span>
     </div>
   </div>`;
 }
 function getBoardColumns(){
-  const filtered = tasks.filter(t=>taskMatchesFilters(t, {ignoreStatus:true}));
+  const filtered = tasks.filter(t=>taskMatchesFilters(t, {ignoreProject:true}));
   const cmp = sortComparators[sortBy] || sortComparators.smart;
-  return STATUSES.map(st=>({ status: st, tasks: filtered.filter(t=>t.status===st.id).sort(cmp) }));
+  return projects.map(p=>({ project: p, tasks: filtered.filter(t=>t.projectId===p.id).sort(cmp) }));
 }
 function renderBoard(){
   const board = document.getElementById('board');
   if(!board) return;
   const columns = getBoardColumns();
   board.innerHTML = columns.map(col=>{
-    const st = col.status, colTasks = col.tasks;
-    return `<div class="board-col" data-status="${st.id}" ondragover="handleBoardDragOver(event,'${st.id}')" ondragleave="handleBoardDragLeave(event)" ondrop="handleBoardDrop(event,'${st.id}')">
-      <div class="board-col-header"><span>${esc(st.label)}</span><span class="count">${colTasks.length}</span></div>
+    const p = col.project, colTasks = col.tasks;
+    return `<div class="board-col" data-project="${p.id}" ondragover="handleBoardDragOver(event,'${p.id}')" ondragleave="handleBoardDragLeave(event)" ondrop="handleBoardDrop(event,'${p.id}')">
+      <div class="board-col-header"><span><i class="fa-solid fa-${p.icon||'folder'} picon"></i> ${esc(p.name)}</span><span class="count">${colTasks.length}</span></div>
       <div class="board-col-body">
         ${colTasks.length===0 ? `<div class="board-empty">No tasks</div>` : colTasks.map(t=>boardCardHtml(t)).join('')}
       </div>
@@ -1063,21 +1060,21 @@ function handleCardDragEnd(e){
   document.querySelectorAll('.board-card.dragging').forEach(el=>el.classList.remove('dragging'));
   document.querySelectorAll('.board-col.drag-over').forEach(el=>el.classList.remove('drag-over'));
 }
-function handleBoardDragOver(e, statusId){
+function handleBoardDragOver(e, projectId){
   e.preventDefault();
   e.currentTarget.classList.add('drag-over');
 }
 function handleBoardDragLeave(e){
   e.currentTarget.classList.remove('drag-over');
 }
-function handleBoardDrop(e, statusId){
+function handleBoardDrop(e, projectId){
   e.preventDefault();
   e.currentTarget.classList.remove('drag-over');
   if(!draggingTaskId) return;
   const id = draggingTaskId; draggingTaskId = null;
   const t = tasks.find(x=>x.id===id);
-  if(!t || t.status===statusId) return;
-  updateTaskField(id, 'status', statusId);
+  if(!t || t.projectId===projectId) return;
+  updateTaskField(id, 'projectId', projectId);
 }
 function selectBoardCard(id){
   const prevId = kbdSelectedTaskId;
@@ -2209,6 +2206,8 @@ document.addEventListener('click', e=>{
   if(!e.target.closest('#linkSplitBtn')) closeLinkMenu();
   const btn = e.target.closest('button');
   if(btn) btn.blur();
+  const cb = e.target.closest('[role="checkbox"]');
+  if(cb) cb.blur();
 });
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
