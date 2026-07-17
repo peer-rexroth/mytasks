@@ -2203,8 +2203,8 @@ function setTagFilter(tg){
   filterTags = filterTags.includes(tg) ? filterTags.filter(x=>x!==tg) : [...filterTags, tg];
   save(); render();
 }
-function setSortBy(v){ sortBy = v; save(); renderList(); }
-function setSearchQuery(v){ searchQuery = v; renderList(); }
+function setSortBy(v){ sortBy = v; save(); render(); }
+function setSearchQuery(v){ searchQuery = v; render(); }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
 function closeAllModals(){
