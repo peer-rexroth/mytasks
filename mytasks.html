@@ -152,6 +152,8 @@
   .board-col-header .count { font-size: 11px; color: var(--text-3); font-weight: 500; }
   .board-col-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; min-height: 40px; }
   .board-empty { text-align: center; color: var(--text-3); font-size: 12px; padding: 16px 0; }
+  .show-more-row { text-align: center; color: var(--text-2); font-size: 12px; font-weight: 500; padding: 8px; cursor: pointer; border-radius: var(--radius); }
+  .show-more-row:hover { background: var(--bg-2); color: var(--text); }
   .board-card { background: var(--bg-2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 9px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 7px; }
   .board-card:hover { border-color: var(--border-2); }
   .board-card.dragging { opacity: .4; }
@@ -583,6 +585,8 @@ let justCompletedSubSubId = null;
 let collapsedTaskIds = new Set();
 let collapsedSubIds = new Set();
 let drawerExpandedSubIds = new Set();
+let showAllCompletedList = false;
+let expandedCompletedProjects = new Set();
 let draggedItem = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id), filterTags = [];
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
@@ -900,17 +904,30 @@ function taskMatchesFilters(t, opts){
   }
   return true;
 }
+function doneLastComparator(cmp){
+  return (a,b)=>{
+    if((a.status==='done')!==(b.status==='done')) return a.status==='done'?1:-1;
+    return cmp(a,b);
+  };
+}
 function getFilteredSortedTasks(){
   let list = tasks.filter(t=>taskMatchesFilters(t));
   const cmp = sortComparators[sortBy] || sortComparators.smart;
-  return list.sort((a,b)=>{
-    if((a.status==='done')!==(b.status==='done')) return a.status==='done'?1:-1;
-    return cmp(a,b);
-  });
+  return list.sort(doneLastComparator(cmp));
+}
+const MAX_COMPLETED_SHOWN = 3;
+function capCompleted(sortedList, expanded){
+  const doneIdx = sortedList.findIndex(t=>t.status==='done');
+  const doneTotal = doneIdx===-1 ? 0 : sortedList.length - doneIdx;
+  if(doneTotal<=MAX_COMPLETED_SHOWN || expanded) return { tasks: sortedList, hiddenCount: 0, doneTotal };
+  return { tasks: sortedList.slice(0, doneIdx + MAX_COMPLETED_SHOWN), hiddenCount: doneTotal - MAX_COMPLETED_SHOWN, doneTotal };
+}
+function getVisibleListTasks(){
+  return capCompleted(getFilteredSortedTasks(), showAllCompletedList);
 }
 
 function renderList(){
-  const list = getFilteredSortedTasks();
+  const { tasks: list, hiddenCount, doneTotal } = getVisibleListTasks();
   const el = document.getElementById('taskList');
   if(list.length===0){
     const html = tasks.length===0
@@ -982,7 +999,9 @@ function renderList(){
         <button class="icon-btn" onclick="event.stopPropagation();deleteTask('${t.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + (doneTotal>MAX_COMPLETED_SHOWN
+    ? `<div class="show-more-row" onclick="toggleShowAllCompletedList()">${showAllCompletedList?'Show fewer completed':`Show ${hiddenCount} more completed`}</div>`
+    : '');
   updateCollapseAllIcon();
 }
 
@@ -1037,7 +1056,11 @@ function boardCardHtml(t){
 function getBoardColumns(){
   const filtered = tasks.filter(t=>taskMatchesFilters(t, {ignoreProject:true}));
   const cmp = sortComparators[sortBy] || sortComparators.smart;
-  return projects.map(p=>({ project: p, tasks: filtered.filter(t=>t.projectId===p.id).sort(cmp) }));
+  return projects.map(p=>{
+    const sorted = filtered.filter(t=>t.projectId===p.id).sort(doneLastComparator(cmp));
+    const { tasks: visible, hiddenCount, doneTotal } = capCompleted(sorted, expandedCompletedProjects.has(p.id));
+    return { project: p, tasks: visible, allCount: sorted.length, hiddenCount, doneTotal };
+  });
 }
 function renderBoard(){
   const board = document.getElementById('board');
@@ -1046,10 +1069,15 @@ function renderBoard(){
   board.innerHTML = columns.map(col=>{
     const p = col.project, colTasks = col.tasks;
     const dimmed = filterProjectId && filterProjectId!==p.id;
+    const expanded = expandedCompletedProjects.has(p.id);
+    const showMoreRow = col.doneTotal>MAX_COMPLETED_SHOWN
+      ? `<div class="show-more-row" onclick="toggleShowAllCompletedProject('${p.id}')">${expanded?'Show fewer completed':`Show ${col.hiddenCount} more completed`}</div>`
+      : '';
     return `<div class="board-col${dimmed?' dimmed':''}" data-project="${p.id}" ondragover="handleBoardDragOver(event,'${p.id}')" ondragleave="handleBoardDragLeave(event)" ondrop="handleBoardDrop(event,'${p.id}')">
-      <div class="board-col-header"><span><i class="fa-solid fa-${p.icon||'folder'} picon"></i> ${esc(p.name)}</span><span class="count">${colTasks.length}</span></div>
+      <div class="board-col-header"><span><i class="fa-solid fa-${p.icon||'folder'} picon"></i> ${esc(p.name)}</span><span class="count">${col.allCount}</span></div>
       <div class="board-col-body">
         ${colTasks.length===0 ? `<div class="board-empty">No tasks</div>` : colTasks.map(t=>boardCardHtml(t)).join('')}
+        ${showMoreRow}
       </div>
     </div>`;
   }).join('');
@@ -1178,7 +1206,7 @@ function closeDrawer(){ activeTaskId = null; renderDrawer(); }
 // ── Bulk selection ────────────────────────────────────────────────────────────
 function handleRowClick(e, id){
   if(e.shiftKey && lastClickedTaskId){
-    const ids = getFilteredSortedTasks().map(t=>t.id);
+    const ids = getVisibleListTasks().tasks.map(t=>t.id);
     const a = ids.indexOf(lastClickedTaskId), b = ids.indexOf(id);
     if(a!==-1 && b!==-1){
       const [start,end] = a<b ? [a,b] : [b,a];
@@ -1877,6 +1905,15 @@ function updateCollapseAllIcon(){
   const iconBoard = document.getElementById('collapseAllIconBoard');
   if(iconBoard) iconBoard.className = cls;
 }
+function toggleShowAllCompletedList(){
+  showAllCompletedList = !showAllCompletedList;
+  renderList();
+}
+function toggleShowAllCompletedProject(projectId){
+  if(expandedCompletedProjects.has(projectId)) expandedCompletedProjects.delete(projectId);
+  else expandedCompletedProjects.add(projectId);
+  renderBoard();
+}
 // ── Project CRUD ──────────────────────────────────────────────────────────────
 function openProjectModal(id){
   editingProjectId = id || null;
@@ -2256,7 +2293,7 @@ document.addEventListener('keydown', e=>{
   }
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='a' && !isTypingTarget(document.activeElement) && !document.querySelector('.modal-bg.open') && !activeTaskId){
     e.preventDefault();
-    const ids = getFilteredSortedTasks().map(t=>t.id);
+    const ids = getVisibleListTasks().tasks.map(t=>t.id);
     if(ids.length){
       selectedTaskIds = new Set(ids);
       renderList(); renderBulkBar();
@@ -2339,7 +2376,7 @@ function handleListKeyNav(e){
   if(isTypingTarget(document.activeElement)) return;
   if(document.querySelector('.modal-bg.open')) return;
   if(activeTaskId) return;
-  const list = getFilteredSortedTasks();
+  const list = getVisibleListTasks().tasks;
   if(!list.length) return;
   if(e.key==='Delete'){
     if(kbdSelectedTaskId && list.some(t=>t.id===kbdSelectedTaskId)){
