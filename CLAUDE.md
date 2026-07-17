@@ -134,6 +134,18 @@ card's entire subtask list unless it also has its own way to un-collapse it
 collapsed from list view must never get permanently stuck hidden on a board
 card with no way back.
 
+## Loading data from anywhere other than `load()`
+
+`normalizeData()` holds all the schema-migration/default-filling logic
+(subtask `subtasks: []`, project `icon` fallback, tag cleanup, repeat/date
+defaults, etc.) and is called by `load()` after reading from `localStorage`.
+**Anything else that assigns to `projects`/`tasks` from an external source
+must also call `normalizeData()` before `render()`** — `applyImport()` (both
+replace and merge modes) does this; the bug this fixed was importing an
+older `.json` export whose schema predated steps/project-icons and crashing
+on render because nothing had migrated it. If you add another data-loading
+path (e.g. a new sync mechanism), route it through `normalizeData()` too.
+
 ## Conventions from this project's history
 
 - Font Awesome 6.5 (`fa-solid`/`fa-regular`) via CDN, used throughout.

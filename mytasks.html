@@ -627,6 +627,30 @@ function defaultTasks(){
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────────
+function normalizeData(){
+  tasks.forEach(t=>{
+    if(!t.subtasks) t.subtasks=[];
+    t.subtasks.forEach(s=>{ if(!Array.isArray(s.subtasks)) s.subtasks=[]; });
+    if(!Array.isArray(t.tags)) t.tags=[];
+    t.tags = t.tags.filter(id=>TAGS.some(tg=>tg.id===id));
+    if(!t.priority) t.priority='medium';
+    if(!t.status) t.status='todo';
+    if(t.completedAt===undefined) t.completedAt = (t.status==='done' && t.updatedAt) ? t.updatedAt : null;
+    if(!t.repeat) t.repeat='none';
+    if(!t.repeatInterval) t.repeatInterval=1;
+    if(!t.repeatWeekdays) t.repeatWeekdays=[];
+    if(t.repeatEndDate===undefined) t.repeatEndDate=null;
+    if(t.repeatMaxOccurrences===undefined) t.repeatMaxOccurrences=null;
+    if(!t.repeatOccurrenceCount) t.repeatOccurrenceCount=0;
+    if(t.dueDate===undefined) t.dueDate=null;
+    if(!t.notes) t.notes='';
+    if(!t.createdAt) t.createdAt=Date.now();
+    if(!t.updatedAt) t.updatedAt=t.createdAt;
+    if(!projects.find(p=>p.id===t.projectId)) t.projectId='proj-inbox';
+  });
+  projects.forEach(p=>{ if(!p.icon) p.icon='folder'; });
+  if(!projects.find(p=>p.id==='proj-inbox')) projects.unshift({id:'proj-inbox',name:'Inbox',icon:'inbox',locked:true});
+}
 function load(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -642,28 +666,7 @@ function load(){
       projects = defaultProjects();
       tasks = defaultTasks();
     }
-    tasks.forEach(t=>{
-      if(!t.subtasks) t.subtasks=[];
-      t.subtasks.forEach(s=>{ if(!Array.isArray(s.subtasks)) s.subtasks=[]; });
-      if(!Array.isArray(t.tags)) t.tags=[];
-      t.tags = t.tags.filter(id=>TAGS.some(tg=>tg.id===id));
-      if(!t.priority) t.priority='medium';
-      if(!t.status) t.status='todo';
-      if(t.completedAt===undefined) t.completedAt = (t.status==='done' && t.updatedAt) ? t.updatedAt : null;
-      if(!t.repeat) t.repeat='none';
-      if(!t.repeatInterval) t.repeatInterval=1;
-      if(!t.repeatWeekdays) t.repeatWeekdays=[];
-      if(t.repeatEndDate===undefined) t.repeatEndDate=null;
-      if(t.repeatMaxOccurrences===undefined) t.repeatMaxOccurrences=null;
-      if(!t.repeatOccurrenceCount) t.repeatOccurrenceCount=0;
-      if(t.dueDate===undefined) t.dueDate=null;
-      if(!t.notes) t.notes='';
-      if(!t.createdAt) t.createdAt=Date.now();
-      if(!t.updatedAt) t.updatedAt=t.createdAt;
-      if(!projects.find(p=>p.id===t.projectId)) t.projectId='proj-inbox';
-    });
-    projects.forEach(p=>{ if(!p.icon) p.icon='folder'; });
-    if(!projects.find(p=>p.id==='proj-inbox')) projects.unshift({id:'proj-inbox',name:'Inbox',icon:'inbox',locked:true});
+    normalizeData();
   }catch(e){
     projects = defaultProjects();
     tasks = defaultTasks();
@@ -2475,9 +2478,11 @@ function applyImport(mode){
     downloadBackup(projects, tasks, `mytasks-backup-before-replace-${new Date().toISOString().slice(0,10)}.json`);
     projects = pendingImportData.projects || defaultProjects();
     tasks = pendingImportData.tasks || [];
+    normalizeData();
     showToast('Backed up previous data, then replaced');
   } else {
     const {added, updated} = mergeData(pendingImportData);
+    normalizeData();
     showToast(`Merged — ${added} added, ${updated} updated`);
   }
   closeAllModals();
