@@ -917,10 +917,11 @@ function getFilteredSortedTasks(){
 }
 const MAX_COMPLETED_SHOWN = 3;
 function capCompleted(sortedList, expanded){
-  const doneIdx = sortedList.findIndex(t=>t.status==='done');
-  const doneTotal = doneIdx===-1 ? 0 : sortedList.length - doneIdx;
-  if(doneTotal<=MAX_COMPLETED_SHOWN || expanded) return { tasks: sortedList, hiddenCount: 0, doneTotal };
-  return { tasks: sortedList.slice(0, doneIdx + MAX_COMPLETED_SHOWN), hiddenCount: doneTotal - MAX_COMPLETED_SHOWN, doneTotal };
+  const notDone = sortedList.filter(t=>t.status!=='done');
+  const done = sortedList.filter(t=>t.status==='done').sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
+  const doneTotal = done.length;
+  if(doneTotal<=MAX_COMPLETED_SHOWN || expanded) return { tasks: notDone.concat(done), hiddenCount: 0, doneTotal };
+  return { tasks: notDone.concat(done.slice(0, MAX_COMPLETED_SHOWN)), hiddenCount: doneTotal - MAX_COMPLETED_SHOWN, doneTotal };
 }
 function getVisibleListTasks(){
   return capCompleted(getFilteredSortedTasks(), showAllCompletedList);
