@@ -1,7 +1,7 @@
 # mytasks
 
 A single-file task manager PWA. Everything — HTML, CSS, and JS — lives in
-`mytasks.html` (~2,700 lines). There is no build step, no bundler, no
+`mytasks.html` (~3,100 lines). There is no build step, no bundler, no
 dependencies beyond a CDN Font Awesome link. Edit the file directly.
 
 ## Running it
