@@ -158,10 +158,15 @@ card with no way back.
 defaults, etc.) and is called by `load()` after reading from `localStorage`.
 **Anything else that assigns to `projects`/`tasks` from an external source
 must also call `normalizeData()` before `render()`** — `applyImport()` (both
-replace and merge modes) does this; the bug this fixed was importing an
-older `.json` export whose schema predated steps/project-icons and crashing
-on render because nothing had migrated it. If you add another data-loading
-path (e.g. a new sync mechanism), route it through `normalizeData()` too.
+replace and merge modes) and `restoreBackup()` do this; the bug this fixed
+was importing an older `.json` export whose schema predated steps/project-
+icons and crashing on render because nothing had migrated it. A full-app
+review later found the same mistake in four separate places at once
+(`linkFile()`, `reconnectFile()`, `initFileSync()`, and `fileSyncWrite()`'s
+cross-tab merge branch) — all four assigned `projects`/`tasks` from an
+external `.json` file without normalizing, so this is a mistake that's
+genuinely easy to repeat. If you add another data-loading path (e.g. a new
+sync mechanism), route it through `normalizeData()` too.
 
 ## Color scheme system
 

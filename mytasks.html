@@ -565,6 +565,13 @@
   .theme-option-desc { font-size: 12px; color: var(--text-2); margin-top: 1px; }
   .theme-option-check { color: var(--blue-text); font-size: 15px; opacity: 0; flex-shrink: 0; }
   .theme-option.selected .theme-option-check { opacity: 1; }
+
+  /* Backups modal */
+  .backups-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+  .backups-empty { font-size: 13px; color: var(--text-2); padding: 8px 2px; line-height: 1.5; }
+  .backup-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: var(--radius); border: 0.5px solid var(--border-2); }
+  .backup-row-date { font-size: 13px; font-weight: 600; }
+  .backup-row-desc { font-size: 12px; color: var(--text-2); margin-top: 1px; }
 </style>
 </head>
 <body>
@@ -584,6 +591,10 @@
         <div class="split-btn-menu-item" onclick="triggerImport();closeLibMenu()">
           <i class="fa-solid fa-upload split-btn-menu-icon"></i>
           <div><div class="split-btn-menu-label">Import</div><div class="split-btn-menu-desc">Load a .json data file</div></div>
+        </div>
+        <div class="split-btn-menu-item" onclick="openBackupsModal();closeLibMenu()">
+          <i class="fa-solid fa-clock-rotate-left split-btn-menu-icon"></i>
+          <div><div class="split-btn-menu-label">Backups</div><div class="split-btn-menu-desc">Restore an automatic daily snapshot</div></div>
         </div>
       </div>
     </div>
@@ -732,6 +743,15 @@
   </div>
 </div>
 
+<!-- Backups modal -->
+<div class="modal-bg" id="backupsModalBg" onclick="if(event.target===this) closeAllModals()">
+  <div class="modal" style="width:400px">
+    <h3>Backups</h3>
+    <div class="backups-list" id="backupsList"></div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="closeAllModals()">Done</button></div>
+  </div>
+</div>
+
 <!-- Shortcuts modal -->
 <div class="modal-bg" id="shortcutsModalBg" onclick="if(event.target===this) closeAllModals()">
   <div class="modal" style="width:440px">
@@ -813,6 +833,8 @@ const TAGS = [
   {id:'someday',     label:'someday',    color:'teal'}
 ];
 const COMPLETED_RETENTION_DAYS = 90;
+const BACKUPS_KEY = 'mytasks_backups';
+const MAX_BACKUPS = 7;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let projects = [], tasks = [];
@@ -929,6 +951,25 @@ function save(){
   const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, colorScheme, compactMode, viewMode };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(fileHandle) fileSyncWrite(data).catch(()=>{});
+  maybeSnapshotBackup();
+}
+function getBackups(){
+  try{ return JSON.parse(localStorage.getItem(BACKUPS_KEY)) || []; }
+  catch(e){ return []; }
+}
+// Takes at most one rolling snapshot per calendar day, keeping the last
+// MAX_BACKUPS days — a local safety net distinct from the linked-file sync,
+// which mirrors live state rather than preserving history. Never lets a
+// storage error (e.g. quota) interrupt the actual save.
+function maybeSnapshotBackup(){
+  try{
+    const backups = getBackups();
+    const today = todayStr();
+    if(backups.length && backups[backups.length-1].date===today) return;
+    backups.push({ date: today, savedAt: Date.now(), projects, tasks });
+    while(backups.length > MAX_BACKUPS) backups.shift();
+    localStorage.setItem(BACKUPS_KEY, JSON.stringify(backups));
+  }catch(e){ /* backups are a bonus, not a requirement for save() to succeed */ }
 }
 // housekeeping: silently drop tasks that have sat completed for longer than the retention window
 function purgeOldCompletedTasks(){
@@ -2794,6 +2835,43 @@ function applyImport(mode){
   }
   closeAllModals();
   save(); render();
+}
+
+function openBackupsModal(){ renderBackupsModal(); document.getElementById('backupsModalBg').classList.add('open'); }
+function renderBackupsModal(){
+  const backups = getBackups();
+  const el = document.getElementById('backupsList');
+  if(backups.length===0){
+    el.innerHTML = `<div class="backups-empty">No backups yet — one is taken automatically the first time you save each day, kept for the last ${MAX_BACKUPS} days.</div>`;
+    return;
+  }
+  el.innerHTML = backups.slice().reverse().map(b=>`
+    <div class="backup-row">
+      <div class="backup-row-info">
+        <div class="backup-row-date">${fmtDate(b.date)}</div>
+        <div class="backup-row-desc">${(b.tasks||[]).length} task${(b.tasks||[]).length===1?'':'s'}</div>
+      </div>
+      <button class="btn btn-sm" onclick="restoreBackup('${b.date}')">Restore</button>
+    </div>
+  `).join('');
+}
+function restoreBackup(date){
+  const backups = getBackups();
+  const b = backups.find(x=>x.date===date);
+  if(!b) return;
+  closeAllModals();
+  openConfirmModal({
+    title: 'Restore this backup?',
+    body: `This replaces your current data with the snapshot from ${fmtDate(date)}. Your current data will be backed up to a file first.`,
+    action: ()=>{
+      downloadBackup(projects, tasks, `mytasks-backup-before-restore-${todayStr()}.json`);
+      projects = b.projects || defaultProjects();
+      tasks = b.tasks || [];
+      normalizeData();
+      save(); render();
+      showToast(`Restored backup from ${fmtDate(date)}`);
+    }
+  });
 }
 
 // ── File System Access API ────────────────────────────────────────────────────
