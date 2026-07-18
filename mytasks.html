@@ -18,7 +18,7 @@
 
   /* ── Theme system ──────────────────────────────────────────────────────────
      Two independent axes: data-theme (light/dark, unchanged, toggled by the
-     existing sun/moon button) and data-scheme (standard/editor, picked from
+     existing sun/moon button) and data-scheme (standard/modern, picked from
      the theme modal). Each scheme defines its own light+dark pair.
      "Standard" is the app's original, untouched palette — :root and the
      bare html[data-theme="dark"] block below are it, so an app with no
@@ -53,24 +53,33 @@
     --purple-bg: #26215c; --purple-text: #afa9ec;
   }
 
-  /* Editor: VS Code's Modern theme — the specific #0078d4 accent blue,
-     its dark-graphite/light-gray neutrals, and its semantic red/amber/
-     cyan/purple/green rather than approximations. Signature: the sidebar
-     footer becomes a status bar (see the scheme-scoped rule further
-     down) — VS Code's most recognizable single UI element. */
-  html[data-scheme="editor"] {
-    --bg: #ffffff; --bg-2: #f3f3f3; --bg-3: #e8e8e8;
-    --text: #1e1e1e; --text-2: #6b6b6b; --text-3: #a0a0a0;
-    --border: rgba(30,30,30,0.10); --border-2: rgba(30,30,30,0.20);
-    --blue-bg: #e6f2fb; --blue-text: #0078d4; --blue-border: #7cbceb;
+  /* Modern: VS Code's actual Dark Modern / Light Modern themes — its
+     dark-graphite/light-gray neutrals and accent blue (#005fb8 light,
+     #3794ff/#0078d4 dark), plus semantic red/amber/cyan/purple/green
+     rather than approximations. Signature: the sidebar footer becomes a
+     status bar (see the scheme-scoped rule further down) — VS Code's
+     most recognizable single UI element. */
+  html[data-scheme="modern"] {
+    /* Light Modern's real overrides (extensions/theme-defaults/themes/
+       light_modern.json in microsoft/vscode, fetched directly): sideBar/
+       activityBar/statusBar background #f8f8f8, foreground AND
+       descriptionForeground both #3b3b3b (it really doesn't differentiate
+       secondary text by color), focusBorder/button.background #005fb8,
+       list.activeSelectionBackground #e8e8e8. text-3 and the tint/border
+       backgrounds are still my own derivation — VS Code's theme has no
+       third text tier or badge-tint concept to draw from. */
+    --bg: #ffffff; --bg-2: #f8f8f8; --bg-3: #e8e8e8;
+    --text: #3b3b3b; --text-2: #3b3b3b; --text-3: #8a8a8a;
+    --border: rgba(59,59,59,0.12); --border-2: rgba(59,59,59,0.24);
+    --blue-bg: #e3edf7; --blue-text: #005fb8; --blue-border: #6ba0d6;
     --teal-bg: #dcf0f5; --teal-text: #0598bc;
     --amber-bg: #faf0d0; --amber-text: #bf8803;
     --red-bg: #fbe7e6; --red-text: #cd3131; --red-border: #e8a099;
     --green-bg: #e2f0e0; --green-text: #388a34;
     --purple-bg: #f5e0fa; --purple-text: #af00db;
-    --blue-dot: #0078d4; --teal-dot: #0598bc; --purple-dot: #af00db;
+    --blue-dot: #005fb8; --teal-dot: #0598bc; --purple-dot: #af00db;
   }
-  html[data-scheme="editor"][data-theme="dark"] {
+  html[data-scheme="modern"][data-theme="dark"] {
     --bg: #1f1f1f; --bg-2: #181818; --bg-3: #2a2d2e;
     --text: #cccccc; --text-2: #9d9d9d; --text-3: #6a6a6a;
     --border: rgba(204,204,204,0.10); --border-2: rgba(204,204,204,0.20);
@@ -538,15 +547,15 @@
   html[data-scheme="standard"] .task-subtask-row .mini-check.checked,
   html[data-scheme="standard"] .subtask-row .sub-check.checked { box-shadow: none; }
 
-  /* Editor scheme signature: numerics in monospace (it's a code editor),
+  /* Modern scheme signature: numerics in monospace (it's a code editor),
      and the sidebar footer restyled as a status bar — solid accent blue,
      left-aligned, monospace — VS Code's single most recognizable element. */
-  html[data-scheme="editor"] .badge-due,
-  html[data-scheme="editor"] .nav-item .count,
-  html[data-scheme="editor"] .project-row .count,
-  html[data-scheme="editor"] .board-col-header .count,
-  html[data-scheme="editor"] .task-list-header { font-family: var(--mono); }
-  html[data-scheme="editor"] .sidebar-footer {
+  html[data-scheme="modern"] .badge-due,
+  html[data-scheme="modern"] .nav-item .count,
+  html[data-scheme="modern"] .project-row .count,
+  html[data-scheme="modern"] .board-col-header .count,
+  html[data-scheme="modern"] .task-list-header { font-family: var(--mono); }
+  html[data-scheme="modern"] .sidebar-footer {
     background: var(--blue-text); color: #fff; text-align: left; font-family: var(--mono); border-top: none;
   }
 
@@ -815,7 +824,7 @@ const COMPACT_KEY = 'mytasks_compact';
 const VIEW_KEY = 'mytasks_view';
 const THEME_SCHEMES = [
   { id: 'standard', name: 'Standard', desc: 'The original look — neutral gray with a blue accent.', swatches: ['#f5f5f3', '#0c447c', '#a32d2d'] },
-  { id: 'editor', name: 'Editor', desc: "VS Code's Modern theme — that unmistakable #0078d4 blue.", swatches: ['#f3f3f3', '#0078d4', '#cd3131'] },
+  { id: 'modern', name: 'Modern', desc: "VS Code's Dark/Light Modern theme — its unmistakable accent blue.", swatches: ['#f8f8f8', '#005fb8', '#cd3131'] },
   { id: 'dracula', name: 'Dracula', desc: 'The official palette — purple, pink, cyan and green on deep gray.', swatches: ['#f8f8f2', '#7c4dd9', '#cb3a2a'] },
   { id: 'github', name: 'GitHub', desc: 'Primer’s actual colors — that solid green button, PR-state red/purple.', swatches: ['#f6f8fa', '#0969da', '#cf222e'] },
   { id: 'githubdimmed', name: 'GitHub Dimmed', desc: 'GitHub Dark Dimmed’s real muted background, same light-mode default.', swatches: ['#f6f8fa', '#478be6', '#e5534b'] },
