@@ -11,12 +11,14 @@
 // approach described in CLAUDE.md, just made repeatable instead of ad hoc.
 //
 // A test file just calls test('description', function(){ ... }) at its
-// top level. Before each test, the harness calls resetState() (fresh
+// top level — the function can be async (e.g. to exercise one of the
+// File System Access sync functions), the runner awaits it either way.
+// Before each test, the harness calls resetState() (fresh
 // defaultProjects()/defaultTasks() + normalizeData()) and clears the fake
 // DOM element cache, so tests never see state left over from another test.
 // Use assertEqual/assertDeepEqual/assertTrue/assertFalse/assertIncludes.
 
-function run(argv) {
+async function run(argv) {
   ObjC.import('Foundation');
   ObjC.import('stdlib');
 
@@ -180,7 +182,7 @@ function run(argv) {
       elCache.clear();
       document.documentElement = makeFakeElement();
       globalThis.__lastBlob = null;
-      t.fn();
+      await t.fn();
       pass++;
       console.log('  ok  ' + t.name);
     } catch (e) {

@@ -2829,6 +2829,7 @@ async function fileSyncWrite(data){
         if(externalData && externalData.tasks && externalData.projects){
           const {added, updated} = mergeData(externalData);
           if(added || updated){
+            normalizeData();
             payload = { ...data, projects, tasks };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
             render();
@@ -2905,6 +2906,7 @@ async function linkFile(){
       let data; try{ data = JSON.parse(existingText); }catch(_){}
       if(data && data.tasks && data.projects){
         const {added, updated} = mergeData(data);
+        normalizeData();
         save(); render(); updateFileSyncUI();
         const parts=[]; if(added) parts.push(`${added} added`); if(updated) parts.push(`${updated} updated`);
         showToast(`Merged from ${handle.name} — ${parts.length?parts.join(', '):'nothing new'} — auto-saving enabled`);
@@ -2939,6 +2941,7 @@ async function reconnectFile(){
       if(data.myDayFilter!==undefined) myDayFilter = data.myDayFilter;
       if(data.thisWeekFilter!==undefined) thisWeekFilter = data.thisWeekFilter;
       if(data.overdueFilter!==undefined) overdueFilter = data.overdueFilter;
+      normalizeData();
       lastSyncedSnapshot = text;
       purgeOldCompletedTasks();
       render();
@@ -2990,6 +2993,7 @@ async function initFileSync(){
         const data = JSON.parse(text);
         if(data.tasks && data.projects){
           projects = data.projects; tasks = data.tasks;
+          normalizeData();
           lastSyncedSnapshot = text;
           purgeOldCompletedTasks();
           render();
