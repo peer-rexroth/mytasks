@@ -15,19 +15,36 @@ Data persists to `localStorage` by default; there's also an optional
 File System Access API "linked file" sync (see `initFileSync`/`fileHandle`)
 for browsers that support it (Chrome/Edge, not Safari).
 
-## No automated tests
+## Tests
 
-There is no test suite and no lint config. To verify a change actually works,
-the approach used throughout this project's history: extract the inline
-`<script>` block, mock just enough of the DOM (`document.getElementById`
-returning cached fake elements with a settable `innerHTML`, plus
-`localStorage`, `navigator`, `window`, `location`) and `eval()` the real code
-in a headless JS engine (`osascript -l JavaScript` works fine on macOS — it's
-JavaScriptCore, no Node install needed), then call the actual functions
-(`renderList()`, `toggleSubCollapse()`, drag handlers, etc.) and assert on the
-resulting state/HTML string. This catches real bugs that reading the code
-does not — e.g. a function silently calling `renderList()` instead of the
-general `render()`, breaking it when triggered from board view.
+There's no lint config, but there is a test suite at `tests/`, built on the
+same approach this project's history used before the suite existed: extract
+the inline `<script>` block, mock just enough of the DOM
+(`document.getElementById` returning cached fake elements with a settable
+`innerHTML`, plus `localStorage`, `navigator`, `window`, `location`) and
+`eval()` the real code in a headless JS engine (`osascript -l JavaScript` —
+JavaScriptCore, no Node install needed, and none is installed in this repo's
+usual dev environment). This catches real bugs that reading the code does
+not — e.g. a function silently calling `renderList()` instead of the general
+`render()`, breaking it when triggered from board view (`tests/cases/
+render-dispatch.test.js` guards exactly this).
+
+Run it with `./tests/run.sh` (optionally `./tests/run.sh someSubstring` to
+run only tests whose name contains that substring). No install step.
+
+Add a test by dropping a `tests/cases/*.test.js` file with `test('description',
+function(){ ... })` calls — see existing files for the pattern. All app code
+plus every `tests/cases/*.test.js` file get concatenated and `eval()`'d
+*together* in one call, which is why a test can read/reassign `tasks`,
+`projects`, and the other top-level `let` state directly by bare name, and
+call any of the app's real functions — they're all sharing the same
+eval'd lexical scope. `tests/harness.js` calls `resetState()` (fresh
+`defaultProjects()`/`defaultTasks()` + `normalizeData()`) and clears the fake
+DOM before every test, so tests never see state left over from another test
+— write fixtures at the top of each test rather than relying on run order.
+Helper functions declared at a test file's top level are visible to every
+other test file too (same shared scope), so keep helper names distinctive
+enough not to collide across files.
 
 ## Data model
 
