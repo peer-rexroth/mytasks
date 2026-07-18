@@ -152,35 +152,36 @@
     --purple-bg: #2e2140; --purple-text: #a371f7;
   }
 
-  /* Monokai Pro: the actual signature six-color set — #ff6188 red, #fc9867
-     orange, #ffd866 yellow, #a9dc76 green, #78dce8 cyan, #ab9df2 purple —
-     on its real warm-gray (not blue-black) background #2d2a2e, all six
-     used exactly once rather than an arbitrary subset. No official light
-     mode exists (it's a dark-only theme family like Dracula), so light
-     here is an invented paler companion using the same six hues, not a
-     literal spec. */
-  html[data-scheme="monokai"] {
-    --bg: #fafaf8; --bg-2: #f0efec; --bg-3: #e3e1dc;
-    --text: #2d2a2e; --text-2: #6b6864; --text-3: #a3a09b;
-    --border: rgba(45,42,46,0.12); --border-2: rgba(45,42,46,0.24);
-    --blue-bg: #ece7fa; --blue-text: #7c5fd6; --blue-border: #b8a5e8;
-    --teal-bg: #d8f0f3; --teal-text: #0e8a9a;
-    --amber-bg: #f7edc8; --amber-text: #a3860a;
-    --red-bg: #fbe1e8; --red-text: #d63763; --red-border: #eda9bc;
-    --green-bg: #e3f0d6; --green-text: #5a8a2e;
-    --purple-bg: #fbe6d6; --purple-text: #c9631f;
-    --blue-dot: #7c5fd6; --teal-dot: #0e8a9a; --purple-dot: #c9631f;
+  /* GitHub Dimmed: GitHub Dark Dimmed's real compiled values (fetched from
+     @primer/primitives directly, not memory — canvas #212830, canvas-
+     muted #262c36, fg #d1d7e0/#9198a1, accent #478be6, danger #e5534b,
+     attention #c69026, success #57ab5a, done #986ee2). Notably NOT the
+     same background as GitHub Dark Default's near-black #0d1117 — that's
+     the whole point of "dimmed". Light mode reuses GitHub Light Default
+     exactly, unchanged from the regular GitHub scheme above. Same teal
+     caveat as GitHub: no official token exists, so it's an approximation. */
+  html[data-scheme="githubdimmed"] {
+    --bg: #ffffff; --bg-2: #f6f8fa; --bg-3: #eaeef2;
+    --text: #1f2328; --text-2: #656d76; --text-3: #8c959f;
+    --border: rgba(31,35,40,0.12); --border-2: rgba(31,35,40,0.24);
+    --blue-bg: #ddf4ff; --blue-text: #0969da; --blue-border: #54aeff;
+    --teal-bg: #daf1f1; --teal-text: #1b7c83;
+    --amber-bg: #fff8c5; --amber-text: #9a6700;
+    --red-bg: #ffebe9; --red-text: #cf222e; --red-border: #ff8182;
+    --green-bg: #dafbe1; --green-text: #1a7f37;
+    --purple-bg: #fbefff; --purple-text: #8250df;
+    --blue-dot: #0969da; --teal-dot: #1b7c83; --purple-dot: #8250df;
   }
-  html[data-scheme="monokai"][data-theme="dark"] {
-    --bg: #2d2a2e; --bg-2: #221f22; --bg-3: #403e41;
-    --text: #fcfcfa; --text-2: #939293; --text-3: #727072;
-    --border: rgba(252,252,250,0.10); --border-2: rgba(252,252,250,0.20);
-    --blue-bg: #332f45; --blue-text: #ab9df2; --blue-border: #8a7bc4;
-    --teal-bg: #1d3438; --teal-text: #78dce8;
-    --amber-bg: #3d3618; --amber-text: #ffd866;
-    --red-bg: #3d232c; --red-text: #ff6188; --red-border: #c94f6e;
-    --green-bg: #25361c; --green-text: #a9dc76;
-    --purple-bg: #3d2c1e; --purple-text: #fc9867;
+  html[data-scheme="githubdimmed"][data-theme="dark"] {
+    --bg: #212830; --bg-2: #262c36; --bg-3: #2d3640;
+    --text: #d1d7e0; --text-2: #9198a1; --text-3: #6b7280;
+    --border: rgba(209,215,224,0.10); --border-2: rgba(209,215,224,0.20);
+    --blue-bg: #16324f; --blue-text: #478be6; --blue-border: #6ba3ea;
+    --teal-bg: #163338; --teal-text: #4cb6c4;
+    --amber-bg: #3a2e14; --amber-text: #c69026;
+    --red-bg: #3d211d; --red-text: #e5534b; --red-border: #a5453e;
+    --green-bg: #1c3320; --green-text: #57ab5a;
+    --purple-bg: #2e2246; --purple-text: #986ee2;
   }
 
   /* Visual Studio Dark: the full IDE (not VS Code) — #007acc accent blue,
@@ -569,15 +570,14 @@
   html[data-scheme="github"] .task-list-header { font-family: var(--mono); }
   html[data-scheme="github"] .btn-primary { background: var(--green-text); border-color: var(--green-text); }
 
-  /* Monokai Pro scheme signature: numerics in monospace, matching the
-     other code-editor-derived schemes. The palette itself — six saturated
-     hues on that specific warm-gray background — is distinctive enough on
-     its own without an extra structural gimmick on top. */
-  html[data-scheme="monokai"] .badge-due,
-  html[data-scheme="monokai"] .nav-item .count,
-  html[data-scheme="monokai"] .project-row .count,
-  html[data-scheme="monokai"] .board-col-header .count,
-  html[data-scheme="monokai"] .task-list-header { font-family: var(--mono); }
+  /* GitHub Dimmed shares the same signature — same product identity, just
+     the dimmed dark variant. */
+  html[data-scheme="githubdimmed"] .badge-due,
+  html[data-scheme="githubdimmed"] .nav-item .count,
+  html[data-scheme="githubdimmed"] .project-row .count,
+  html[data-scheme="githubdimmed"] .board-col-header .count,
+  html[data-scheme="githubdimmed"] .task-list-header { font-family: var(--mono); }
+  html[data-scheme="githubdimmed"] .btn-primary { background: var(--green-text); border-color: var(--green-text); }
 
   /* Visual Studio Dark scheme signature: numerics in monospace, and the
      brand/icon purple on the topbar icon specifically — everywhere else
@@ -818,7 +818,7 @@ const THEME_SCHEMES = [
   { id: 'editor', name: 'Editor', desc: "VS Code's Modern theme — that unmistakable #0078d4 blue.", swatches: ['#f3f3f3', '#0078d4', '#cd3131'] },
   { id: 'dracula', name: 'Dracula', desc: 'The official palette — purple, pink, cyan and green on deep gray.', swatches: ['#f8f8f2', '#7c4dd9', '#cb3a2a'] },
   { id: 'github', name: 'GitHub', desc: 'Primer’s actual colors — that solid green button, PR-state red/purple.', swatches: ['#f6f8fa', '#0969da', '#cf222e'] },
-  { id: 'monokai', name: 'Monokai Pro', desc: 'The signature six-color set on its real warm-gray background.', swatches: ['#e3e1dc', '#7c5fd6', '#d63763'] },
+  { id: 'githubdimmed', name: 'GitHub Dimmed', desc: 'GitHub Dark Dimmed’s real muted background, same light-mode default.', swatches: ['#f6f8fa', '#478be6', '#e5534b'] },
   { id: 'vsdark', name: 'Visual Studio Dark', desc: 'The full IDE’s actual theme — #007acc blue, interface-teal, comment-green.', swatches: ['#f5f5f5', '#007acc', '#a31515'] }
 ];
 const PROJECT_ICONS = ['folder','inbox','layer-group','clipboard','briefcase','building','users','handshake','chart-line','laptop','code','calendar-days','envelope','dollar-sign','rocket','graduation-cap','house','heart','star','book','camera','plane','dumbbell','palette'];
