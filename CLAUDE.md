@@ -163,6 +163,66 @@ older `.json` export whose schema predated steps/project-icons and crashing
 on render because nothing had migrated it. If you add another data-loading
 path (e.g. a new sync mechanism), route it through `normalizeData()` too.
 
+## Color scheme system
+
+Two independent axes control appearance: `data-theme` (`light`/`dark`,
+toggled by the sun/moon button, unchanged since before schemes existed) and
+`data-scheme` (picked from the palette-icon button's modal). Each scheme
+defines its own light *and* dark CSS variable pair, so the two axes combine
+freely — e.g. `[data-scheme="dracula"][data-theme="dark"]`.
+
+- **`THEME_SCHEMES`** (near the top of the `<script>` block) is the single
+  source of truth for which schemes exist — each entry has `id`, `name`,
+  `desc`, and `swatches` (three hex values shown as dots in the picker).
+  `id` must exactly match a `[data-scheme="..."]` selector; nothing
+  enforces this automatically except `tests/cases/theme.test.js`'s "every
+  THEME_SCHEMES entry actually has a matching CSS block" test, which will
+  fail loudly on a typo but won't catch a selector that exists with no
+  matching `THEME_SCHEMES` entry (a harmless orphan, not a crash).
+- **`:root, html[data-scheme="standard"]`** and the bare
+  `html[data-theme="dark"]` block are the original, untouched palette —
+  this is what renders when `data-scheme` is absent entirely, so it must
+  stay exactly as-is. Every other scheme is defined as
+  `html[data-scheme="x"] { ... }` (light) and
+  `html[data-scheme="x"][data-theme="dark"] { ... }` (dark) — the dark
+  block's extra attribute selector always wins on specificity over the
+  bare `html[data-theme="dark"]`, so block order in the file doesn't
+  matter for correctness.
+- A handful of type/checkbox touches (bolder wordmark and task titles,
+  wider-tracked section labels, a colored ring on checked checkboxes) are
+  global defaults that every scheme except Standard inherits; Standard
+  explicitly reverts them back to the original values in a
+  `html[data-scheme="standard"] .foo { ... }` block so it stays the true
+  original look rather than original colors wearing new type.
+- Persistence mirrors how `theme`/`compactMode`/`viewMode` already work:
+  `colorScheme` (state) + `SCHEME_KEY`/`localStorage` (fast path on load)
+  + folded into the `save()`/`load()`/`fileSyncWrite()` payloads (so it
+  travels through the linked-file cross-device sync too).
+- **Accuracy convention**: when a scheme claims to replicate a real
+  product's theme (VS Code, GitHub, Dracula, etc.), verify the actual
+  values — via `WebFetch`/`WebSearch` against the real source (a theme's
+  official spec page, or its GitHub repo/compiled CSS/design-token
+  files) — rather than reconstructing from memory. This project has
+  gotten real values wrong from memory more than once (Dracula's light
+  mode, GitHub Dark Dimmed's background, VS Code Light Modern's accent
+  color all needed correcting after a fetch). Where no real equivalent
+  exists for something our UI needs (e.g. GitHub's semantic palette has
+  no teal token; Dracula/Monokai-style dark-only themes have no official
+  light mode), say so in the scheme's comment rather than presenting an
+  invented value as if it were verified.
+- Each scheme may add its own one-off "signature" CSS rules (e.g. GitHub's
+  primary button going solid green, a scheme-specific monospace treatment
+  for numerics) — these live in their own scoped block further down in
+  the stylesheet, separate from the variable definitions, and are called
+  out by name in a comment above the scheme's variable block.
+
+To add a scheme: add its light+dark CSS variable blocks, add any signature
+rules, add a `THEME_SCHEMES` entry, and add its `id` to the sorted list in
+`tests/cases/theme.test.js`'s last test. To remove one: reverse all of the
+above and grep the whole repo for its id/name to catch stray comments —
+past removals have left references behind that grep caught but a partial
+manual removal wouldn't have.
+
 ## Conventions from this project's history
 
 - Font Awesome 6.5 (`fa-solid`/`fa-regular`) via CDN, used throughout.
