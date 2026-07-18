@@ -82,6 +82,70 @@
     --purple-bg: #2e2036; --purple-text: #c586c0;
   }
 
+  /* Dracula: the official palette, not an approximation — #282a36 with
+     #6272a4 comments, #bd93f9 purple, #ff79c6 pink, #8be9fd cyan, #50fa7b
+     green, #ffb86c orange, #ff5555 red. Dracula doesn't really have an
+     official light mode, so light here is a paler companion built from
+     the same hue families (a la the community "Alucard" variant), not a
+     literal spec. Signature: pink for "in progress" (Dracula's own syntax
+     highlighting leans on pink for keywords) and a soft purple glow on
+     the brand icon (scheme-scoped rule further down). */
+  html[data-scheme="dracula"] {
+    --bg: #f8f8f2; --bg-2: #f1f1ea; --bg-3: #e6e6d8;
+    --text: #282a36; --text-2: #5b5f73; --text-3: #8c8fa3;
+    --border: rgba(40,42,54,0.12); --border-2: rgba(40,42,54,0.24);
+    --blue-bg: #ece3fb; --blue-text: #7c4dd9; --blue-border: #b79ceb;
+    --teal-bg: #d9eef5; --teal-text: #036a96;
+    --amber-bg: #f7e6c8; --amber-text: #a3590a;
+    --red-bg: #fbe2df; --red-text: #cb3a2a; --red-border: #e8a89f;
+    --green-bg: #dcf0d8; --green-text: #14710a;
+    --purple-bg: #f7dce8; --purple-text: #a3144d;
+    --blue-dot: #7c4dd9; --teal-dot: #036a96; --purple-dot: #a3144d;
+  }
+  html[data-scheme="dracula"][data-theme="dark"] {
+    --bg: #282a36; --bg-2: #21222c; --bg-3: #44475a;
+    --text: #f8f8f2; --text-2: #6272a4; --text-3: #4d5673;
+    --border: rgba(248,248,242,0.10); --border-2: rgba(248,248,242,0.22);
+    --blue-bg: #3a3355; --blue-text: #bd93f9; --blue-border: #9d7ee8;
+    --teal-bg: #1c3a42; --teal-text: #8be9fd;
+    --amber-bg: #4a3820; --amber-text: #ffb86c;
+    --red-bg: #47272a; --red-text: #ff5555; --red-border: #a5423f;
+    --green-bg: #1c3a26; --green-text: #50fa7b;
+    --purple-bg: #4a2740; --purple-text: #ff79c6;
+  }
+
+  /* GitHub: Primer's actual semantic colors — #0969da/#4493f8 accent blue,
+     #1a7f37/#3fb950 success green, #cf222e/#f85149 danger red, #8250df/
+     #a371f7 "merged" purple, #9a6700/#d29922 attention amber. GitHub's
+     semantic palette has no named teal, so that one slot is an
+     approximation from Primer's broader scale, not a literal token — flag
+     it if the real value differs. Signature: the primary button becomes
+     GitHub's solid green (its most iconic "primary action" button, see
+     the scheme-scoped rule further down). */
+  html[data-scheme="github"] {
+    --bg: #ffffff; --bg-2: #f6f8fa; --bg-3: #eaeef2;
+    --text: #1f2328; --text-2: #656d76; --text-3: #8c959f;
+    --border: rgba(31,35,40,0.12); --border-2: rgba(31,35,40,0.24);
+    --blue-bg: #ddf4ff; --blue-text: #0969da; --blue-border: #54aeff;
+    --teal-bg: #daf1f1; --teal-text: #1b7c83;
+    --amber-bg: #fff8c5; --amber-text: #9a6700;
+    --red-bg: #ffebe9; --red-text: #cf222e; --red-border: #ff8182;
+    --green-bg: #dafbe1; --green-text: #1a7f37;
+    --purple-bg: #fbefff; --purple-text: #8250df;
+    --blue-dot: #0969da; --teal-dot: #1b7c83; --purple-dot: #8250df;
+  }
+  html[data-scheme="github"][data-theme="dark"] {
+    --bg: #0d1117; --bg-2: #161b22; --bg-3: #21262d;
+    --text: #e6edf3; --text-2: #9198a1; --text-3: #6e7681;
+    --border: rgba(230,237,243,0.10); --border-2: rgba(230,237,243,0.20);
+    --blue-bg: #0c2d6b; --blue-text: #4493f8; --blue-border: #1f6feb;
+    --teal-bg: #0d2d32; --teal-text: #39c5cf;
+    --amber-bg: #3b2900; --amber-text: #d29922;
+    --red-bg: #3c1618; --red-text: #f85149; --red-border: #a5282e;
+    --green-bg: #14261d; --green-text: #3fb950;
+    --purple-bg: #2e2140; --purple-text: #a371f7;
+  }
+
   /* Native <input type="date"> controls (the picker icon and its popup
      calendar) are browser-rendered and ignore our theme variables — they
      only respond to color-scheme. Without this, the picker icon defaults
@@ -413,6 +477,26 @@
     background: var(--blue-text); color: #fff; text-align: left; font-family: var(--mono); border-top: none;
   }
 
+  /* Dracula scheme signature: numerics in monospace (its main use case is
+     as a code-editor syntax theme), and a soft purple glow on the brand
+     icon — a small nod to the palette's neon-on-dark character. */
+  html[data-scheme="dracula"] .badge-due,
+  html[data-scheme="dracula"] .nav-item .count,
+  html[data-scheme="dracula"] .project-row .count,
+  html[data-scheme="dracula"] .board-col-header .count,
+  html[data-scheme="dracula"] .task-list-header { font-family: var(--mono); }
+  html[data-scheme="dracula"] .topbar-brand i { text-shadow: 0 0 8px var(--blue-text); }
+
+  /* GitHub scheme signature: numerics in monospace (commit SHAs, code),
+     and the primary button becomes GitHub's solid green — its most
+     recognizable single UI element ("Merge pull request", "New", etc). */
+  html[data-scheme="github"] .badge-due,
+  html[data-scheme="github"] .nav-item .count,
+  html[data-scheme="github"] .project-row .count,
+  html[data-scheme="github"] .board-col-header .count,
+  html[data-scheme="github"] .task-list-header { font-family: var(--mono); }
+  html[data-scheme="github"] .btn-primary { background: var(--green-text); border-color: var(--green-text); }
+
   /* Theme picker modal */
   .theme-options { display: flex; flex-direction: column; gap: 10px; }
   .theme-option { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius); border: 0.5px solid var(--border-2); cursor: pointer; }
@@ -638,7 +722,9 @@ const COMPACT_KEY = 'mytasks_compact';
 const VIEW_KEY = 'mytasks_view';
 const THEME_SCHEMES = [
   { id: 'standard', name: 'Standard', desc: 'The original look — neutral gray with a blue accent.', swatches: ['#f5f5f3', '#0c447c', '#a32d2d'] },
-  { id: 'editor', name: 'Editor', desc: "VS Code's Modern theme — that unmistakable #0078d4 blue.", swatches: ['#f3f3f3', '#0078d4', '#cd3131'] }
+  { id: 'editor', name: 'Editor', desc: "VS Code's Modern theme — that unmistakable #0078d4 blue.", swatches: ['#f3f3f3', '#0078d4', '#cd3131'] },
+  { id: 'dracula', name: 'Dracula', desc: 'The official palette — purple, pink, cyan and green on deep gray.', swatches: ['#f8f8f2', '#7c4dd9', '#cb3a2a'] },
+  { id: 'github', name: 'GitHub', desc: 'Primer’s actual colors — that solid green button, PR-state red/purple.', swatches: ['#f6f8fa', '#0969da', '#cf222e'] }
 ];
 const PROJECT_ICONS = ['folder','inbox','layer-group','clipboard','briefcase','building','users','handshake','chart-line','laptop','code','calendar-days','envelope','dollar-sign','rocket','graduation-cap','house','heart','star','book','camera','plane','dumbbell','palette'];
 const CAT_COLORS = [
