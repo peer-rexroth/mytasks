@@ -193,41 +193,6 @@
     --purple-bg: #2e2246; --purple-text: #986ee2;
   }
 
-  /* Visual Studio Dark: the full IDE (not VS Code) — #007acc accent blue,
-     #1e1e1e/#252526/#2d2d30 background tiers, #4ec9b0 interface-teal and
-     #6a9955 comment-green (both genuinely from Microsoft's own editor
-     color scheme). Both light and dark are drawn from VS's actual
-     shipped themes, not an invented companion — VS has long had an
-     official Light theme too. Note the accent blue is historically
-     almost the same color as Editor's — VS Code inherited it from Visual
-     Studio — so the topbar icon instead uses VS's actual brand/icon
-     purple (#68217a) as a decorative nod (scheme-scoped rule further
-     down), distinct from the real theme accent, which stays blue
-     everywhere else. */
-  html[data-scheme="vsdark"] {
-    --bg: #ffffff; --bg-2: #f5f5f5; --bg-3: #e8e8e8;
-    --text: #1e1e1e; --text-2: #6d6d6d; --text-3: #a0a0a0;
-    --border: rgba(30,30,30,0.10); --border-2: rgba(30,30,30,0.20);
-    --blue-bg: #e6f2fb; --blue-text: #007acc; --blue-border: #7cbceb;
-    --teal-bg: #dcf0f5; --teal-text: #267f99;
-    --amber-bg: #f7f0d0; --amber-text: #795e26;
-    --red-bg: #fbe9e7; --red-text: #a31515; --red-border: #e0a89e;
-    --green-bg: #dcf0dc; --green-text: #008000;
-    --purple-bg: #f0e0f5; --purple-text: #68217a;
-    --blue-dot: #007acc; --teal-dot: #267f99; --purple-dot: #68217a;
-  }
-  html[data-scheme="vsdark"][data-theme="dark"] {
-    --bg: #1e1e1e; --bg-2: #252526; --bg-3: #2d2d30;
-    --text: #dcdcdc; --text-2: #9e9e9e; --text-3: #6d6d6d;
-    --border: rgba(220,220,220,0.10); --border-2: rgba(220,220,220,0.20);
-    --blue-bg: #0d2d4a; --blue-text: #007acc; --blue-border: #1c97ea;
-    --teal-bg: #123a34; --teal-text: #4ec9b0;
-    --amber-bg: #3d3210; --amber-text: #ffb900;
-    --red-bg: #47232a; --red-text: #e74856; --red-border: #a53d47;
-    --green-bg: #22331a; --green-text: #6a9955;
-    --purple-bg: #2e2036; --purple-text: #a76fc4;
-  }
-
   /* Native <input type="date"> controls (the picker icon and its popup
      calendar) are browser-rendered and ignore our theme variables — they
      only respond to color-scheme. Without this, the picker icon defaults
@@ -588,17 +553,6 @@
   html[data-scheme="githubdimmed"] .task-list-header { font-family: var(--mono); }
   html[data-scheme="githubdimmed"] .btn-primary { background: var(--green-text); border-color: var(--green-text); }
 
-  /* Visual Studio Dark scheme signature: numerics in monospace, and the
-     brand/icon purple on the topbar icon specifically — everywhere else
-     (buttons, focus rings, drag-over, kbd-selection) stays the theme's
-     real accent blue, unlike the icon which is a deliberate brand nod. */
-  html[data-scheme="vsdark"] .badge-due,
-  html[data-scheme="vsdark"] .nav-item .count,
-  html[data-scheme="vsdark"] .project-row .count,
-  html[data-scheme="vsdark"] .board-col-header .count,
-  html[data-scheme="vsdark"] .task-list-header { font-family: var(--mono); }
-  html[data-scheme="vsdark"] .topbar-brand i { color: var(--purple-text); }
-
   /* Theme picker modal */
   .theme-options { display: flex; flex-direction: column; gap: 10px; }
   .theme-option { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius); border: 0.5px solid var(--border-2); cursor: pointer; }
@@ -827,8 +781,7 @@ const THEME_SCHEMES = [
   { id: 'modern', name: 'Modern', desc: "VS Code's Dark/Light Modern theme — its unmistakable accent blue.", swatches: ['#f8f8f8', '#005fb8', '#cd3131'] },
   { id: 'dracula', name: 'Dracula', desc: 'The official palette — purple, pink, cyan and green on deep gray.', swatches: ['#f8f8f2', '#7c4dd9', '#cb3a2a'] },
   { id: 'github', name: 'GitHub', desc: 'Primer’s actual colors — that solid green button, PR-state red/purple.', swatches: ['#f6f8fa', '#0969da', '#cf222e'] },
-  { id: 'githubdimmed', name: 'GitHub Dimmed', desc: 'GitHub Dark Dimmed’s real muted background, same light-mode default.', swatches: ['#f6f8fa', '#478be6', '#e5534b'] },
-  { id: 'vsdark', name: 'Visual Studio Dark', desc: 'The full IDE’s actual theme — #007acc blue, interface-teal, comment-green.', swatches: ['#f5f5f5', '#007acc', '#a31515'] }
+  { id: 'githubdimmed', name: 'GitHub Dimmed', desc: 'GitHub Dark Dimmed’s real muted background, same light-mode default.', swatches: ['#f6f8fa', '#478be6', '#e5534b'] }
 ];
 const PROJECT_ICONS = ['folder','inbox','layer-group','clipboard','briefcase','building','users','handshake','chart-line','laptop','code','calendar-days','envelope','dollar-sign','rocket','graduation-cap','house','heart','star','book','camera','plane','dumbbell','palette'];
 const CAT_COLORS = [

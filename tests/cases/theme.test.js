@@ -36,5 +36,5 @@ test('every THEME_SCHEMES entry actually has a matching CSS block', function () 
   // A cheap guard against typos: the scheme ids the picker offers should
   // all be spelled the same way the retheme's [data-scheme="..."] selectors expect.
   const ids = THEME_SCHEMES.map(s => s.id).sort();
-  assertDeepEqual(ids, ['dracula', 'github', 'githubdimmed', 'modern', 'standard', 'vsdark']);
+  assertDeepEqual(ids, ['dracula', 'github', 'githubdimmed', 'modern', 'standard']);
 });
