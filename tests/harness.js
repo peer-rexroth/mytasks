@@ -76,7 +76,7 @@ async function run(argv) {
       removeAttribute(k) { delete attrs[k]; },
       addEventListener() {}, removeEventListener() {},
       appendChild(c) { return c; }, removeChild() {}, remove() {},
-      focus() {}, blur() {}, click() {}, scrollIntoView() {},
+      focus() {}, blur() {}, click() {}, scrollIntoView() {}, select() {},
       closest() { return null; },
       querySelector() { return null; },
       querySelectorAll() { return []; }

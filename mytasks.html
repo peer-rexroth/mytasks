@@ -950,8 +950,13 @@ function defaultTasks(){
 // ── Persistence ───────────────────────────────────────────────────────────────
 function normalizeData(){
   tasks.forEach(t=>{
+    if(!isSafeId(t.id)) t.id=genId();
     if(!t.subtasks) t.subtasks=[];
-    t.subtasks.forEach(s=>{ if(!Array.isArray(s.subtasks)) s.subtasks=[]; });
+    t.subtasks.forEach(s=>{
+      if(!isSafeId(s.id)) s.id=genId();
+      if(!Array.isArray(s.subtasks)) s.subtasks=[];
+      s.subtasks.forEach(ss=>{ if(!isSafeId(ss.id)) ss.id=genId(); });
+    });
     if(!Array.isArray(t.tags)) t.tags=[];
     t.tags = t.tags.filter(id=>TAGS.some(tg=>tg.id===id));
     if(!t.priority) t.priority='medium';
@@ -969,7 +974,10 @@ function normalizeData(){
     if(!t.updatedAt) t.updatedAt=t.createdAt;
     if(!projects.find(p=>p.id===t.projectId)) t.projectId='proj-inbox';
   });
-  projects.forEach(p=>{ if(!p.icon) p.icon='folder'; });
+  projects.forEach(p=>{
+    if(!isSafeId(p.id)) p.id=genId();
+    if(!p.icon || (!PROJECT_ICONS.includes(p.icon) && p.icon!=='trash')) p.icon='folder';
+  });
   if(!projects.find(p=>p.id==='proj-inbox')) projects.unshift({id:'proj-inbox',name:'Inbox',icon:'inbox',locked:true});
   if(!projects.find(p=>p.id==='proj-deleted')) projects.push({id:'proj-deleted',name:'Deleted',icon:'trash',locked:true});
   if(!Array.isArray(deletedTaskIds)) deletedTaskIds=[];
@@ -1046,6 +1054,16 @@ function purgeOldCompletedTasks(){
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+// Every id in the app is interpolated unescaped into onclick/data-id HTML
+// attributes at render time (genId()'s output is always plain alphanumeric,
+// so this was never a problem for locally-created data) — but mergeData()
+// and applyImport('replace') trust ids from an external .json file as-is.
+// A crafted id containing a quote could break out of an attribute and inject
+// markup the moment it renders. normalizeData() calls this to regenerate any
+// id that doesn't look locally-generated, closing that off at the one place
+// every external-data path already routes through, rather than having to
+// esc() every one of the ~40 places an id gets interpolated.
+function isSafeId(id){ return typeof id==='string' && /^[a-zA-Z0-9_-]+$/.test(id); }
 function tombstone(list, id){
   const existing = list.find(x=>x.id===id);
   if(existing) existing.deletedAt = Date.now();
@@ -1748,7 +1766,7 @@ function renderDrawer(){
         </div>
         <div class="field">
           <label>Due date</label>
-          <input type="date" value="${t.dueDate||''}" onchange="updateTaskField('${t.id}','dueDate',this.value||null)">
+          <input type="date" value="${esc(t.dueDate||'')}" onchange="updateTaskField('${t.id}','dueDate',this.value||null)">
         </div>
       </div>
       <div class="field">
@@ -1788,7 +1806,7 @@ function renderDrawer(){
       <div class="field-row">
         <div class="field">
           <label>Ends on</label>
-          <input type="date" value="${t.repeatEndDate||''}" onchange="updateTaskField('${t.id}','repeatEndDate',this.value||null)">
+          <input type="date" value="${esc(t.repeatEndDate||'')}" onchange="updateTaskField('${t.id}','repeatEndDate',this.value||null)">
         </div>
         <div class="field">
           <label>After N times</label>
@@ -1874,7 +1892,10 @@ function quickAddTask(event){
 function advanceRecurring(id){
   const t = tasks.find(x=>x.id===id); if(!t) return null;
   const prevDueDate = t.dueDate;
-  const prevSubtasks = (t.subtasks||[]).map(s=>({...s}));
+  // Deep-copy each subtask's own steps array too — a shallow {...s} spread
+  // would share the same steps array/objects with the live task, so
+  // resetting step .done below would silently corrupt this undo snapshot.
+  const prevSubtasks = (t.subtasks||[]).map(s=>({...s, subtasks:(s.subtasks||[]).map(ss=>({...ss}))}));
   const prevRepeat = t.repeat;
   const prevOccCount = t.repeatOccurrenceCount || 0;
   const next = nextOccurrence(t.dueDate, t);
@@ -1885,7 +1906,7 @@ function advanceRecurring(id){
   } else {
     t.dueDate = next;
     t.repeatOccurrenceCount = newCount;
-    (t.subtasks||[]).forEach(s=>{ s.done=false; });
+    (t.subtasks||[]).forEach(s=>{ s.done=false; (s.subtasks||[]).forEach(ss=>{ ss.done=false; }); });
   }
   t.updatedAt = Date.now();
   return {
@@ -2041,6 +2062,7 @@ function duplicateTask(id){
     status: 'todo',
     completedAt: null,
     priority: t.priority,
+    tags: (t.tags||[]).slice(),
     dueDate: null,
     repeat: t.repeat || 'none',
     repeatInterval: t.repeatInterval || 1,
@@ -2249,7 +2271,11 @@ function toggleSubCollapse(subId){
   render();
 }
 function getVisibleTasksForCollapse(){
-  return viewMode==='board' ? tasks.filter(t=>taskMatchesFilters(t, {ignoreStatus:true})) : getFilteredSortedTasks();
+  // Must match getBoardColumns()'s ignore axis — board view ignores the
+  // project filter (every column stays visible, just dimmed), not status.
+  // Using the wrong axis here meant collapse-all only touched the active
+  // project filter's column while every other visible column sat untouched.
+  return viewMode==='board' ? tasks.filter(t=>taskMatchesFilters(t, {ignoreProject:true})) : getFilteredSortedTasks();
 }
 function toggleCollapseAllTasks(){
   const list = getVisibleTasksForCollapse();
@@ -2334,6 +2360,7 @@ function deleteProject(id){
         if(t.projectId===id){
           movedTaskIds.push(t.id);
           t.projectId = t.status==='done' ? 'proj-deleted' : 'proj-inbox';
+          t.updatedAt = Date.now();
         }
       });
       if(filterProjectId===id) filterProjectId=null;
@@ -2341,7 +2368,7 @@ function deleteProject(id){
       showToast('Project deleted', false, ()=>{
         untombstone(deletedProjectIds, id);
         projects.splice(idx,0,removed);
-        movedTaskIds.forEach(tid=>{ const t=tasks.find(x=>x.id===tid); if(t) t.projectId=id; });
+        movedTaskIds.forEach(tid=>{ const t=tasks.find(x=>x.id===tid); if(t){ t.projectId=id; t.updatedAt=Date.now(); } });
         save(); render();
         showToast('Project restored');
       });

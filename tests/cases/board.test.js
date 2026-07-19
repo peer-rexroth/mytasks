@@ -26,6 +26,17 @@ test('handleBoardDrop moves the dragged task to the target column\'s project, no
   assertEqual(tasks.find(x => x.id === t.id).status, 'todo', 'status should be untouched by a board column drop');
 });
 
+test('getVisibleTasksForCollapse uses the same ignoreProject axis as getBoardColumns, so collapse-all reaches every visible column', function () {
+  tasks = [
+    { id: 't1', title: 'Personal task', projectId: 'proj-personal', status: 'todo', priority: 'medium', subtasks: [], tags: [] },
+    { id: 't2', title: 'Work task', projectId: 'proj-work', status: 'todo', priority: 'medium', subtasks: [], tags: [] }
+  ];
+  viewMode = 'board';
+  filterProjectId = 'proj-work';
+  const visible = getVisibleTasksForCollapse();
+  assertTrue(visible.some(t => t.id === 't1'), 'a task in a non-filtered project column should still be reachable by collapse-all, since board view shows every column regardless of the project filter');
+});
+
 test('handleBoardDrop is a no-op when nothing is being dragged', function () {
   draggingTaskId = null;
   const before = JSON.stringify(tasks);

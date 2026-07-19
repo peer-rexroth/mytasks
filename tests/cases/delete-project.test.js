@@ -48,6 +48,15 @@ test('routed completed tasks stay visible with no project filter (All Tasks)', f
   assertTrue(taskMatchesFilters(tasks.find(x => x.id === 'done1')));
 });
 
+test('deleteProject bumps updatedAt on tasks it reassigns, so a later merge does not resurrect the deleted project onto them', function () {
+  fixtureForDelete();
+  tasks.forEach(t => { t.updatedAt = 1; });
+  deleteProject('proj-work');
+  modalTarget.action();
+  assertTrue(tasks.find(x => x.id === 'active1').updatedAt > 1, 'reassigned task should get a fresh updatedAt, matching every other projectId-changing function');
+  assertTrue(tasks.find(x => x.id === 'done1').updatedAt > 1);
+});
+
 test('undoing a project delete restores the original project on both tasks', function () {
   fixtureForDelete();
   deleteProject('proj-work');

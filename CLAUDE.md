@@ -200,6 +200,21 @@ external `.json` file without normalizing, so this is a mistake that's
 genuinely easy to repeat. If you add another data-loading path (e.g. a new
 sync mechanism), route it through `normalizeData()` too.
 
+`normalizeData()` is also the security boundary for the same reason: every
+id in the app is interpolated unescaped into `onclick`/`data-id` HTML
+attributes at render time (`esc()` only covers *content* fields — title,
+notes, subtask/step text, project name — never `id`). That's fine for
+locally-created data since `genId()` only ever produces plain alphanumeric
+strings, but `mergeData()` and `applyImport('replace')` push `id`/`icon`
+values from an external `.json` file in as-is. `isSafeId()` plus the
+`PROJECT_ICONS`-membership check in `normalizeData()` regenerate/reject
+anything that couldn't have come from `genId()` or the icon picker, closing
+that off at the one place already documented above as required for every
+external-data path — rather than having to `esc()` every one of the ~40
+places an id gets interpolated. `t.dueDate`/`t.repeatEndDate` get the same
+treatment via plain `esc()` at their two render sites (drawer date inputs)
+since normalizeData() doesn't validate their shape, only fills in `null`.
+
 ## Deletion tombstones — why `mergeData()` can't just diff arrays
 
 `deletedTaskIds`/`deletedProjectIds` (each an array of `{id, deletedAt}`) are
