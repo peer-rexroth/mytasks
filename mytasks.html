@@ -669,7 +669,7 @@
     <div class="bulk-bar" id="bulkBar"></div>
     <div class="quickadd">
       <i class="fa-solid fa-plus"></i>
-      <input type="text" id="quickAddInput" placeholder="Add a task and press Enter…" onkeydown="quickAddTask(event)">
+      <input spellcheck="true" type="text" id="quickAddInput" placeholder="Add a task and press Enter…" onkeydown="quickAddTask(event)">
     </div>
     <div class="task-list" id="taskListWrap">
       <div class="task-list-header"><button class="icon-btn subtask-toggle" onclick="toggleCollapseAllTasks();this.blur()" title="Collapse/expand all subtasks"><i class="fa-solid fa-angles-down" id="collapseAllIcon"></i></button><span>Task</span><span>Project</span><span>Priority</span><span style="margin-left:-4px">Status</span><span style="margin-left:-8px">Due</span><span style="margin-left:-12px"></span></div>
@@ -698,7 +698,7 @@
 <div class="modal-bg" id="projectModalBg" onclick="if(event.target===this) closeAllModals()">
   <div class="modal">
     <h3 id="projectModalTitle">New Project</h3>
-    <input type="text" id="projectNameInput" placeholder="Project name" maxlength="40" onkeydown="if(event.key==='Enter') saveProjectModal()">
+    <input spellcheck="true" type="text" id="projectNameInput" placeholder="Project name" maxlength="40" onkeydown="if(event.key==='Enter') saveProjectModal()">
     <div class="color-swatches" id="colorSwatches"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeAllModals()">Cancel</button>
@@ -1256,7 +1256,7 @@ function renderList(){
       </div>
       <div class="task-main">
         ${renamingTaskId===t.id
-          ? `<input type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
+          ? `<input spellcheck="true" type="text" class="task-title-input" id="renameTaskInput" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
           : `<span class="task-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${highlightMatch(t.title, searchQuery)}</span>`}
         ${(t.tags||[]).map(id=>{ const tg=tagById(id); if(!tg) return ''; const tc=colorOf(tg.color); return `<span class="badge badge-tag" style="background:${tc.bg};color:${tc.text}">${esc(tg.label)}</span>`; }).join('')}
       </div>
@@ -1271,7 +1271,7 @@ function renderList(){
           ${(s.subtasks||[]).length>0?`<button class="icon-btn subtask-toggle" onclick="event.stopPropagation();toggleSubCollapse('${s.id}');this.blur()" title="${collapsedSubIds.has(s.id)?'Expand':'Collapse'} steps"><i class="fa-solid fa-chevron-${collapsedSubIds.has(s.id)?'right':'down'}"></i></button>`:''}
           <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
           ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
-            ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputList" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
+            ? `<input spellcheck="true" type="text" class="task-subtask-text-input" id="renameSubtaskInputList" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
             : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','list')">${highlightMatch(s.text, searchQuery)}</span>`}
           <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();demoteSubtaskToStep('${t.id}','${s.id}')" title="Make this a step of the subtask above"><i class="fa-solid fa-indent"></i></button>
           <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();deleteSubtask('${t.id}','${s.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
@@ -1282,16 +1282,16 @@ function renderList(){
             ondragover="handleHierarchyDragOver(event,'step','${s.id}','${ss.id}')" ondragleave="handleHierarchyDragLeave(event)" ondrop="handleHierarchyDrop(event,'${t.id}','step','${s.id}','${ss.id}')">
             <div class="mini-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
             ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
-              ? `<input type="text" class="task-subtask-text-input" id="renameSubSubtaskInputList" value="${esc(ss.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
+              ? `<input spellcheck="true" type="text" class="task-subtask-text-input" id="renameSubSubtaskInputList" value="${esc(ss.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
               : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubSubtask('${t.id}','${s.id}','${ss.id}','list')">${highlightMatch(ss.text, searchQuery)}</span>`}
             <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();promoteStepToSubtask('${t.id}','${s.id}','${ss.id}')" title="Make this its own subtask"><i class="fa-solid fa-outdent"></i></button>
             <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();deleteSubSubtask('${t.id}','${s.id}','${ss.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
           </div>
         `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
-          <input type="text" id="inlineSubtaskInput" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentInlineSubtaskInput('${t.id}');}">
+          <input spellcheck="true" type="text" id="inlineSubtaskInput" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentInlineSubtaskInput('${t.id}');}">
         </div>`:''}</div>`:''}
       `).join('')}${inlineAddSubtaskTaskId===t.id && !inlineAddParentSubId?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
-        <input type="text" id="inlineSubtaskInput" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentInlineSubtaskInput('${t.id}');}}">
+        <input spellcheck="true" type="text" id="inlineSubtaskInput" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentInlineSubtaskInput('${t.id}');}}">
       </div>`:''}</div>`:''}
       <div class="row-actions">
         ${t.repeat && t.repeat!=='none' ? `<button class="icon-btn" onclick="event.stopPropagation();skipOccurrence('${t.id}')" title="Skip to next occurrence"><i class="fa-solid fa-forward-step"></i></button>` : ''}
@@ -1323,7 +1323,7 @@ function boardCardHtml(t){
     <div class="board-card-top">
       <div class="task-checkbox ${t.status==='done'?'checked':''} ${t.id===justCompletedTaskId?'pop':''}" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="event.stopPropagation();toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
       ${renamingTaskId===t.id
-        ? `<input type="text" class="task-title-input" id="renameTaskInputBoard" style="flex:1" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
+        ? `<input spellcheck="true" type="text" class="task-title-input" id="renameTaskInputBoard" style="flex:1" value="${esc(t.title)}" onclick="event.stopPropagation()" onblur="commitRenameTask('${t.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameTask(); }">`
         : `<div class="board-card-title" onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameTask('${t.id}')">${highlightMatch(t.title, searchQuery)}</div>`}
       ${priorityIcon}
       ${dueBadge}
@@ -1333,7 +1333,7 @@ function boardCardHtml(t){
       <div class="task-subtask-row ${s.done?'done':''}">
         <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
         ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
-          ? `<input type="text" class="task-subtask-text-input" id="renameSubtaskInputBoard" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
+          ? `<input spellcheck="true" type="text" class="task-subtask-text-input" id="renameSubtaskInputBoard" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
           : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubtask('${t.id}','${s.id}','board')">${highlightMatch(s.text, searchQuery)}</span>`}
         ${(s.subtasks||[]).length>0?`<button class="icon-btn subtask-toggle" onclick="event.stopPropagation();toggleSubCollapse('${s.id}');this.blur()" title="${collapsedSubIds.has(s.id)?'Expand':'Collapse'} steps"><i class="fa-solid fa-chevron-${collapsedSubIds.has(s.id)?'right':'down'}"></i></button>`:''}
       </div>
@@ -1343,10 +1343,10 @@ function boardCardHtml(t){
           <span onclick="event.stopPropagation()">${highlightMatch(ss.text, searchQuery)}</span>
         </div>
       `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
-        <input type="text" id="inlineSubtaskInputBoard" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentInlineSubtaskInput('${t.id}');}">
+        <input spellcheck="true" type="text" id="inlineSubtaskInputBoard" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentInlineSubtaskInput('${t.id}');}">
       </div>`:''}</div>`:''}
     `).join('')}${inlineAddSubtaskTaskId===t.id && !inlineAddParentSubId?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
-      <input type="text" id="inlineSubtaskInputBoard" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentInlineSubtaskInput('${t.id}');}}">
+      <input spellcheck="true" type="text" id="inlineSubtaskInputBoard" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentInlineSubtaskInput('${t.id}');}}">
     </div>`:''}</div>`:''}
     <div class="board-card-meta">
       <span class="badge badge-status-${t.status}">${statusLabel(t.status)}</span>
@@ -1661,13 +1661,13 @@ function renderDrawer(){
   drawer.innerHTML = `
     <div class="drawer-header">
       <div class="task-checkbox ${t.status==='done'?'checked':''} ${t.id===justCompletedTaskId?'pop':''}" style="margin-top:6px" role="checkbox" aria-checked="${t.status==='done'}" aria-label="Mark task done" tabindex="0" onclick="toggleTaskDone('${t.id}')"><i class="fa-solid fa-check"></i></div>
-      <input class="title-input" id="drawerTitleInput" value="${esc(t.title)}" oninput="updateTaskFieldLive('${t.id}','title',this.value)" placeholder="Task title">
+      <input spellcheck="true" class="title-input" id="drawerTitleInput" value="${esc(t.title)}" oninput="updateTaskFieldLive('${t.id}','title',this.value)" placeholder="Task title">
       <button class="icon-btn" onclick="closeDrawer()" title="Close"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="drawer-body">
       <div class="field">
         <label>Notes</label>
-        <textarea oninput="updateTaskFieldLive('${t.id}','notes',this.value)" placeholder="Add notes…">${esc(t.notes||'')}</textarea>
+        <textarea spellcheck="true" oninput="updateTaskFieldLive('${t.id}','notes',this.value)" placeholder="Add notes…">${esc(t.notes||'')}</textarea>
       </div>
       <div class="field-row">
         <div class="field">
@@ -1748,7 +1748,7 @@ function renderDrawer(){
             <i class="fa-solid fa-grip-vertical sub-drag-handle"></i>
             <div class="sub-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
             ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
-              ? `<input type="text" class="sub-text-input" id="renameSubtaskInputDrawer" value="${esc(s.text)}" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
+              ? `<input spellcheck="true" type="text" class="sub-text-input" id="renameSubtaskInputDrawer" value="${esc(s.text)}" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); }">`
               : `<div class="sub-text" ondblclick="startRenameSubtask('${t.id}','${s.id}','drawer')">${esc(s.text)}</div>`}
             <button class="icon-btn sub-step-toggle" onclick="toggleDrawerStepsPanel('${s.id}');this.blur()" title="${stepsOpen?'Hide':(stepCount>0?'Show':'Add')} steps"><i class="fa-solid fa-${toggleIcon}"></i></button>
             <button class="icon-btn" onclick="demoteSubtaskToStep('${t.id}','${s.id}')" title="Make this a step of the subtask above"><i class="fa-solid fa-indent"></i></button>
@@ -1763,20 +1763,20 @@ function renderDrawer(){
                 <i class="fa-solid fa-grip-vertical sub-drag-handle"></i>
                 <div class="sub-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
                 ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
-                  ? `<input type="text" class="sub-text-input" id="renameSubSubtaskInputDrawer" value="${esc(ss.text)}" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
+                  ? `<input spellcheck="true" type="text" class="sub-text-input" id="renameSubSubtaskInputDrawer" value="${esc(ss.text)}" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); }">`
                   : `<div class="sub-text" ondblclick="startRenameSubSubtask('${t.id}','${s.id}','${ss.id}','drawer')">${esc(ss.text)}</div>`}
                 <button class="icon-btn" onclick="promoteStepToSubtask('${t.id}','${s.id}','${ss.id}')" title="Make this its own subtask"><i class="fa-solid fa-outdent"></i></button>
                 <button class="icon-btn sub-del" onclick="deleteSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-trash"></i></button>
               </div>
             `).join('')}
             <div class="task-subtask-add-row">
-              <input type="text" id="newSubSubtaskInput-${s.id}" placeholder="Add a step + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentDrawerSubtaskInput('${t.id}','${s.id}');}">
+              <input spellcheck="true" type="text" id="newSubSubtaskInput-${s.id}" placeholder="Add a step + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentDrawerSubtaskInput('${t.id}','${s.id}');}">
             </div>
           </div>
           ` : ''}
         `;}).join('')}
         <div class="add-row">
-          <input type="text" id="newSubtaskInput" placeholder="Add subtask + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentDrawerSubtaskInput('${t.id}');}}">
+          <input spellcheck="true" type="text" id="newSubtaskInput" placeholder="Add subtask + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentDrawerSubtaskInput('${t.id}');}}">
         </div>
       </div>
     </div>
