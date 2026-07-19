@@ -468,13 +468,27 @@
   .import-option:hover { background: var(--bg-2); }
   .import-option-text strong { display: block; font-size: 13px; font-weight: 500; }
   .import-option-text span { font-size: 12px; color: var(--text-2); }
-  .help-row { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text-2); line-height: 1.5; margin-bottom: 12px; }
-  .help-row i { width: 16px; margin-top: 2px; color: var(--text-3); }
-  .help-tip { font-size: 12px; color: var(--text-3); background: var(--bg-2); border-radius: var(--radius); padding: 10px 12px; line-height: 1.6; }
-  .shortcuts-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
-  .shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text-2); }
-  .kbd-group { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
-  kbd { font-family: var(--mono); font-size: 11px; color: var(--text); background: var(--bg-2); border: 0.5px solid var(--border-2); border-radius: 4px; padding: 2px 6px; box-shadow: 0 1px 0 var(--border-2); }
+  .help-modal { width: 560px; max-height: 80vh; overflow-y: auto; gap: 0; padding: 0; }
+  .help-modal-header { padding: 18px 22px 14px; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg); z-index: 1; }
+  .help-modal-header h3 { font-size: 16px; }
+  .help-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 20px; }
+  .help-section { display: flex; flex-direction: column; gap: 8px; }
+  .help-section-title { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
+  .help-row { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.6; color: var(--text-2); }
+  .help-row i { font-size: 14px; color: var(--text-3); flex-shrink: 0; margin-top: 2px; width: 16px; text-align: center; }
+  .help-divider { height: 0.5px; background: var(--border); }
+  .help-badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 4px; font-family: var(--mono); white-space: nowrap; }
+  .help-badge-blue  { background: var(--blue-bg);  color: var(--blue-text); }
+  .help-badge-teal  { background: var(--teal-bg);  color: var(--teal-text); }
+  .help-badge-amber { background: var(--amber-bg); color: var(--amber-text); }
+  .help-tip { background: var(--bg-2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 12px; color: var(--text-2); line-height: 1.6; }
+  .help-tip strong { color: var(--text); font-weight: 500; }
+  .shortcut-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+  .shortcut-row span { color: var(--text-2); }
+  .shortcut-keys { display: flex; gap: 3px; }
+  .shortcut-group-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+  .shortcut-group-label:first-child { margin-top: 0; }
+  kbd { font-family: var(--mono); font-size: 11px; background: var(--bg-3); border: 0.5px solid var(--border-2); border-radius: 4px; padding: 2px 6px; color: var(--text); box-shadow: 0 1px 0 var(--border-2); display: inline-block; line-height: 1.4; }
 
   /* toast */
   .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; transform: translateY(80px); opacity: 0; transition: all 0.25s ease; z-index: 300; }
@@ -607,7 +621,8 @@
     <button class="btn btn-icon btn-sm" onclick="openShortcutsModal()" title="Keyboard shortcuts"><i class="fa-solid fa-keyboard"></i></button>
     <button class="btn btn-icon btn-sm" onclick="openThemeModal()" title="Color scheme"><i class="fa-solid fa-palette"></i></button>
     <button class="btn btn-icon btn-sm" onclick="toggleTheme()" title="Toggle theme"><i class="fa-solid fa-circle-half-stroke" id="themeIcon"></i></button>
-    <button class="btn btn-icon btn-sm" onclick="openHelpModal()" title="Help"><i class="fa-solid fa-circle-question"></i></button>
+    <button class="btn btn-icon btn-sm" onclick="openHelpModal()" title="Help"><i class="fa-regular fa-circle-question"></i></button>
+    <button class="btn btn-icon btn-sm" onclick="openAboutModal()" title="About"><i class="fa-solid fa-circle-info"></i></button>
   </div>
 </div>
 <input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileImport(event)">
@@ -727,15 +742,99 @@
 
 <!-- Help modal -->
 <div class="modal-bg" id="helpModalBg" onclick="if(event.target===this) closeAllModals()">
-  <div class="modal" style="width:440px">
-    <h3>About mytasks</h3>
-    <div>
-      <div class="help-row"><i class="fa-solid fa-hard-drive"></i><span><strong style="color:var(--text)">Your data is stored locally</strong> in this browser (localStorage). It persists between sessions on this device but isn't synced anywhere.</span></div>
-      <div class="help-row"><i class="fa-solid fa-link"></i><span><strong style="color:var(--text)">Link file</strong> (Chrome/Edge) auto-saves every change to a real <code style="font-family:var(--mono);font-size:11px">.json</code> file on your disk, so your data survives even if browser storage is cleared.</span></div>
-      <div class="help-row"><i class="fa-solid fa-download"></i><span><strong style="color:var(--text)">Export</strong> downloads a one-off backup. <strong style="color:var(--text)">Import</strong> loads a backup back in, merging or replacing your current data.</span></div>
+  <div class="modal help-modal">
+    <div class="help-modal-header">
+      <h3><i class="fa-regular fa-circle-question" style="margin-right:8px;color:var(--text-3)"></i>How mytasks works</h3>
+      <button class="btn btn-sm" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div class="help-tip">Nothing here ever leaves your machine — there's no server, no account, and no admin rights required to run this app.</div>
-    <div class="modal-actions"><button class="btn btn-primary" onclick="closeAllModals()">Got it</button></div>
+    <div class="help-body">
+
+      <div class="help-section">
+        <div class="help-section-title">Overview</div>
+        <div class="help-row"><i class="fa-regular fa-square-check"></i><span>mytasks is a local task manager — <strong style="color:var(--text)">projects</strong>, <strong style="color:var(--text)">priorities</strong>, <strong style="color:var(--text)">due dates</strong>, <strong style="color:var(--text)">tags</strong> and <strong style="color:var(--text)">recurring tasks</strong>, with subtasks nested one level deep. Everything runs in your browser — no account, no server.</span></div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-section-title">Creating &amp; editing tasks</div>
+        <div class="help-row"><i class="fa-solid fa-plus"></i><span>Type into <strong style="color:var(--text)">Add a task…</strong> at the top and press <kbd>Enter</kbd>. New tasks go to whichever project you're currently filtered to, or Inbox otherwise.</span></div>
+        <div class="help-row"><i class="fa-solid fa-arrow-pointer"></i><span>Click a task to open the <strong style="color:var(--text)">drawer</strong> — the full editor for project, priority, due date, notes, tags and repeat settings.</span></div>
+        <div class="help-row"><i class="fa-solid fa-pen"></i><span><strong style="color:var(--text)">Double-click</strong> a task's title (in list, board, or the drawer) to rename it in place.</span></div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-section-title">Subtasks &amp; steps</div>
+        <div class="help-row"><i class="fa-solid fa-list-check"></i><span>Nesting goes two levels deep: <strong style="color:var(--text)">task → subtask → step</strong>. Add either from the hover-revealed inputs in list view, or the drawer's permanent add-subtask/add-step fields.</span></div>
+        <div class="help-row"><i class="fa-solid fa-grip-lines"></i><span><strong style="color:var(--text)">Drag</strong> subtasks/steps to reorder them, including moving a step between subtasks. Use the hierarchy buttons (or <kbd>Tab</kbd>/<kbd>Shift</kbd>+<kbd>Tab</kbd> while adding) to promote a step to its own subtask, or demote a subtask into the previous one as a step.</span></div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-section-title">Recurring tasks</div>
+        <div class="help-row"><i class="fa-solid fa-repeat"></i><span>Set a <strong style="color:var(--text)">repeat</strong> interval (daily/weekly/monthly/yearly) in the drawer, optionally with an end date or a maximum number of occurrences. Completing or skipping a recurring task automatically advances it to the next due date instead of marking it done for good.</span></div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-section-title">Projects, tags &amp; filtering</div>
+        <div class="help-row"><i class="fa-solid fa-folder"></i><span>Manage <strong style="color:var(--text)">projects</strong> from the sidebar's <i class="fa-solid fa-plus" style="font-size:11px"></i> button. Deleting a project moves its active tasks to Inbox for triage; completed tasks stay done, out of Inbox's view.</span></div>
+        <div class="help-row"><i class="fa-solid fa-filter"></i><span>Filter by status, priority, or tags from the toolbar, or use the sidebar's <strong style="color:var(--text)">My Day</strong>, <strong style="color:var(--text)">This Week</strong>, and <strong style="color:var(--text)">Overdue</strong> smart views.</span></div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-section-title">List vs. board view</div>
+        <div class="help-row"><i class="fa-solid fa-table-columns"></i><span><strong style="color:var(--text)">Board view</strong> groups cards by <strong style="color:var(--text)">project</strong> (not status) — drag a card to a different column to reassign its project. <strong style="color:var(--text)">List view</strong> has full subtask/step editing; board view is intentionally lighter (steps are read/toggle-only there).</span></div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-section-title">Keyboard shortcuts</div>
+        <div id="helpShortcutsBody" style="display:flex;flex-direction:column;gap:2px"></div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-section-title">Data &amp; sync</div>
+        <div class="help-row"><i class="fa-solid fa-hard-drive"></i><span><strong style="color:var(--text)">Your data is stored locally</strong> in this browser (localStorage). It persists between sessions on this device but isn't synced anywhere by default.</span></div>
+        <div class="help-row"><i class="fa-solid fa-link"></i><span><strong style="color:var(--text)">Link file</strong> (Chrome/Edge) auto-saves every change to a real <code style="font-family:var(--mono);font-size:11px">.json</code> file on your disk, so your data survives even if browser storage is cleared.</span></div>
+        <div class="help-row"><i class="fa-solid fa-download"></i><span><strong style="color:var(--text)">Export</strong> downloads a one-off backup. <strong style="color:var(--text)">Import</strong> loads a backup back in, merging or replacing your current data.</span></div>
+        <div class="help-tip">Nothing here ever leaves your machine — there's no server, no account, and no admin rights required to run this app. Automatic daily snapshots (last 7 days) are also available under <strong>Data → Backups</strong>.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- About modal -->
+<div class="modal-bg" id="aboutModalBg" onclick="if(event.target===this) closeAllModals()">
+  <div class="modal" style="width:360px;gap:18px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <i class="fa-solid fa-list-check" style="font-size:22px;color:var(--blue-text)"></i>
+      <div>
+        <div style="font-size:16px"><span style="font-weight:600">mytasks</span></div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:1px">A local-first task manager</div>
+      </div>
+    </div>
+    <div style="height:0.5px;background:var(--border)"></div>
+    <div style="font-size:13px;color:var(--text-2);line-height:1.7">
+      <div>Created by <strong style="color:var(--text)">Peer Rexroth</strong></div>
+      <div style="margin-top:6px">Feedback &amp; suggestions welcome:</div>
+      <div style="margin-top:3px">
+        <a href="mailto:peer.rexroth@db.com" style="color:var(--blue-text);text-decoration:none;font-weight:500">peer.rexroth@db.com</a>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeAllModals()">Close</button>
+    </div>
   </div>
 </div>
 
@@ -759,24 +858,13 @@
 
 <!-- Shortcuts modal -->
 <div class="modal-bg" id="shortcutsModalBg" onclick="if(event.target===this) closeAllModals()">
-  <div class="modal" style="width:440px">
-    <h3>Keyboard shortcuts</h3>
-    <div class="shortcuts-list">
-      <div class="shortcut-row"><span>Navigate tasks</span><span class="kbd-group"><kbd>&uarr;</kbd><kbd>&darr;</kbd></span></div>
-      <div class="shortcut-row"><span>Open selected task</span><span class="kbd-group"><kbd>Enter</kbd></span></div>
-      <div class="shortcut-row"><span>Collapse/expand selected task (list view)</span><span class="kbd-group"><kbd>Space</kbd></span></div>
-      <div class="shortcut-row"><span>Add subtask to selected task</span><span class="kbd-group"><kbd>Tab</kbd></span></div>
-      <div class="shortcut-row"><span>Delete selected task</span><span class="kbd-group"><kbd>Delete</kbd></span></div>
-      <div class="shortcut-row"><span>Undo last delete or edit</span><span class="kbd-group"><kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd></span></div>
-      <div class="shortcut-row"><span>Focus search</span><span class="kbd-group"><kbd>/</kbd></span></div>
-      <div class="shortcut-row"><span>Focus quick-add</span><span class="kbd-group"><kbd>N</kbd></span></div>
-      <div class="shortcut-row"><span>Close drawer/modal, clear selection</span><span class="kbd-group"><kbd>Esc</kbd></span></div>
-      <div class="shortcut-row"><span>Open a task</span><span class="kbd-group">Double-click</span></div>
-      <div class="shortcut-row"><span>Rename title or subtask</span><span class="kbd-group">Double-click text</span></div>
-      <div class="shortcut-row"><span>Multi-select tasks</span><span class="kbd-group"><kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+Click, <kbd>Shift</kbd>+Click</span></div>
-      <div class="shortcut-row"><span>Select all visible tasks</span><span class="kbd-group"><kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>A</kbd></span></div>
+  <div class="modal" style="width:340px;gap:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:15px;font-weight:500"><i class="fa-solid fa-keyboard" style="margin-right:8px;color:var(--text-3)"></i>Keyboard shortcuts</div>
+      <button class="btn btn-sm" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div class="modal-actions"><button class="btn btn-primary" onclick="closeAllModals()">Got it</button></div>
+    <div style="height:0.5px;background:var(--border)"></div>
+    <div id="shortcutsBody" style="display:flex;flex-direction:column;gap:2px"></div>
   </div>
 </div>
 
@@ -2630,8 +2718,48 @@ function confirmModalAction(){
   if(modalTarget && modalTarget.action) modalTarget.action();
   closeAllModals();
 }
-function openHelpModal(){ document.getElementById('helpModalBg').classList.add('open'); }
-function openShortcutsModal(){ document.getElementById('shortcutsModalBg').classList.add('open'); }
+// Shared by the Shortcuts modal and the Help modal's condensed shortcuts
+// section — platform-aware modifier key labels (⌘/⇧ on Mac, Ctrl/Shift
+// elsewhere), grouped the same way both places.
+function shortcutsListHtml(){
+  const mac = /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const mod = mac ? '⌘' : 'Ctrl';
+  const shift = mac ? '⇧' : 'Shift';
+  const k = (...keys)=>keys.map(x=>`<kbd>${x}</kbd>`).join('');
+  const row = (label, ...keys)=>`<div class="shortcut-row"><span>${label}</span><div class="shortcut-keys">${k(...keys)}</div></div>`;
+  const group = label=>`<div class="shortcut-group-label">${label}</div>`;
+  return [
+    group('Navigation'),
+    row('Focus search', '/'),
+    row('Focus quick-add', 'N'),
+    row('Navigate tasks', '↑', '↓'),
+    row('Open selected task', '↵'),
+    group('Task actions'),
+    row('Collapse/expand selected task (list view)', 'Space'),
+    row('Add subtask to selected task', 'Tab'),
+    row('Delete selected task', 'Delete'),
+    row('Undo last delete or edit', mod, 'Z'),
+    group('Selection'),
+    row('Multi-select tasks', mod, 'Click'),
+    row('Range-select tasks', shift, 'Click'),
+    row('Select all visible tasks', mod, 'A'),
+    group('General'),
+    row('Open a task', 'Double-click'),
+    row('Rename title or subtask', 'Double-click text'),
+    row('Show shortcuts', '?'),
+    row('Close drawer/modal, clear selection', 'Esc'),
+  ].join('');
+}
+function openHelpModal(){
+  const el = document.getElementById('helpShortcutsBody');
+  if(el) el.innerHTML = shortcutsListHtml();
+  document.getElementById('helpModalBg').classList.add('open');
+}
+function openShortcutsModal(){
+  document.getElementById('shortcutsBody').innerHTML = shortcutsListHtml();
+  document.getElementById('shortcutsModalBg').classList.add('open');
+}
+function openAboutModal(){ document.getElementById('aboutModalBg').classList.add('open'); }
 function renderThemeModal(){
   document.getElementById('themeOptions').innerHTML = THEME_SCHEMES.map(s=>`
     <div class="theme-option ${s.id===colorScheme?'selected':''}" onclick="setColorScheme('${s.id}')">
@@ -2735,6 +2863,11 @@ document.addEventListener('keydown', e=>{
   if(e.key==='n' && !e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget(document.activeElement) && !document.querySelector('.modal-bg.open')){
     e.preventDefault();
     document.getElementById('quickAddInput')?.focus();
+    return;
+  }
+  if(e.key==='?' && !isTypingTarget(document.activeElement) && !document.querySelector('.modal-bg.open')){
+    e.preventDefault();
+    openShortcutsModal();
     return;
   }
   if(viewMode==='board'){ handleBoardKeyNav(e); } else { handleListKeyNav(e); }
