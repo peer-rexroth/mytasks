@@ -901,18 +901,7 @@ function visibleProjects(){
   return projects.filter(p=>p.id!=='proj-deleted');
 }
 function defaultTasks(){
-  const now = Date.now();
-  const today = new Date().toISOString().slice(0,10);
-  return [
-    { id:'t1', title:'Welcome to mytasks 👋', notes:'Click a task to open this panel and edit its details — project, priority, due date and subtasks. This is a demo task, delete it whenever you like.',
-      projectId:'proj-inbox', status:'todo', priority:'medium', dueDate:null,
-      subtasks:[{id:'s1',text:'Check off a subtask',done:false},{id:'s2',text:'Click the circle on the left to complete this task',done:false}],
-      createdAt:now, updatedAt:now },
-    { id:'t2', title:'Plan the week', notes:'', projectId:'proj-work', status:'doing', priority:'high', dueDate:today,
-      subtasks:[], createdAt:now-1000, updatedAt:now-1000 },
-    { id:'t3', title:'Buy groceries', notes:'', projectId:'proj-personal', status:'todo', priority:'low', dueDate:null,
-      subtasks:[], createdAt:now-2000, updatedAt:now-2000 }
-  ];
+  return [];
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────────

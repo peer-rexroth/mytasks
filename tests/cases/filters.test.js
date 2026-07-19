@@ -2,25 +2,33 @@
 // board view and list view rely on to pick which axis they group by
 // without the sidebar/toolbar filters collapsing everything to one column.
 
+function filterFixtureTask(){
+  return { id: 't1', title: 'Fixture task', projectId: 'proj-personal', status: 'todo', priority: 'medium', subtasks: [], tags: [] };
+}
+
 test('project filter excludes tasks from other projects by default', function () {
+  tasks = [filterFixtureTask()];
   filterProjectId = 'proj-work';
   const t = tasks.find(x => x.projectId === 'proj-personal');
   assertFalse(taskMatchesFilters(t));
 });
 
 test('ignoreProject lets a task through regardless of the project filter', function () {
+  tasks = [filterFixtureTask()];
   filterProjectId = 'proj-work';
   const t = tasks.find(x => x.projectId === 'proj-personal');
   assertTrue(taskMatchesFilters(t, { ignoreProject: true }));
 });
 
 test('status filter excludes non-matching status by default', function () {
+  tasks = [filterFixtureTask()];
   filterStatus = ['done'];
   const t = tasks.find(x => x.status === 'todo');
   assertFalse(taskMatchesFilters(t));
 });
 
 test('ignoreStatus lets a task through regardless of the status filter', function () {
+  tasks = [filterFixtureTask()];
   filterStatus = ['done'];
   const t = tasks.find(x => x.status === 'todo');
   assertTrue(taskMatchesFilters(t, { ignoreStatus: true }));

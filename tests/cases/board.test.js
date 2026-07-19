@@ -9,6 +9,7 @@ test('getBoardColumns returns one column per visible project, in order', functio
 });
 
 test('getBoardColumns ignores the project filter within each column (ignoreProject)', function () {
+  tasks = [{ id: 't1', title: 'Personal task', projectId: 'proj-personal', status: 'todo', priority: 'medium', subtasks: [], tags: [] }];
   filterProjectId = 'proj-work';
   const cols = getBoardColumns();
   const personalCol = cols.find(c => c.project.id === 'proj-personal');
@@ -16,6 +17,7 @@ test('getBoardColumns ignores the project filter within each column (ignoreProje
 });
 
 test('handleBoardDrop moves the dragged task to the target column\'s project, not its status', function () {
+  tasks = [{ id: 't1', title: 'Inbox task', projectId: 'proj-inbox', status: 'todo', priority: 'medium', subtasks: [], tags: [] }];
   const t = tasks.find(x => x.projectId === 'proj-inbox');
   draggingTaskId = t.id;
   const fakeEvent = { preventDefault() {}, currentTarget: document.getElementById('board') };

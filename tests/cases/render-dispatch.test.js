@@ -3,7 +3,12 @@
 // renderList() instead of the general render(), so the change silently
 // does nothing when the user is on board view.
 
+function dispatchFixtureTask(){
+  return { id: 't1', title: 'Fixture task', projectId: 'proj-inbox', status: 'todo', priority: 'medium', subtasks: [], tags: [] };
+}
+
 test('toggleTaskCollapse re-renders board view when viewMode is board', function () {
+  tasks = [dispatchFixtureTask()];
   viewMode = 'board';
   render();
   document.getElementById('board').innerHTML = '';
@@ -12,6 +17,7 @@ test('toggleTaskCollapse re-renders board view when viewMode is board', function
 });
 
 test('toggleSubCollapse re-renders board view when viewMode is board', function () {
+  tasks = [dispatchFixtureTask()];
   viewMode = 'board';
   tasks[0].subtasks = [{ id: 's1', text: 'Sub', done: false, subtasks: [{ id: 'st1', text: 'Step', done: false }] }];
   render();
@@ -21,6 +27,7 @@ test('toggleSubCollapse re-renders board view when viewMode is board', function 
 });
 
 test('toggleTaskDone re-renders whichever view is active', function () {
+  tasks = [dispatchFixtureTask()];
   viewMode = 'board';
   render();
   document.getElementById('board').innerHTML = '';
