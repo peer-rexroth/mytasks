@@ -605,7 +605,7 @@
     <button class="btn btn-icon btn-sm" onclick="openHelpModal()" title="Help"><i class="fa-solid fa-circle-question"></i></button>
   </div>
 </div>
-<input type="file" id="fileInput" style="display:none" onchange="handleFileImport(event)">
+<input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileImport(event)">
 
 <div class="layout">
   <div class="sidebar">
@@ -3044,13 +3044,10 @@ async function createNewLinkedFile(){
 async function linkFile(){
   if(!window.showOpenFilePicker){ showToast('File linking requires Chrome or Edge', true); return; }
   try{
-    // No `types` filter here — restricting to .json makes some OS file
-    // pickers (macOS's Open panel in particular) grey out real .json files
-    // whose extension the OS doesn't confidently recognize as matching,
-    // blocking selection entirely. Content is already validated below
-    // (`data && data.tasks && data.projects`) with a toast on a bad pick,
-    // so the filter was UX-only, not a safety net.
-    const [handle] = await window.showOpenFilePicker({ multiple: false });
+    const [handle] = await window.showOpenFilePicker({
+      types: [{description:'JSON', accept:{'application/json':['.json']}}],
+      multiple: false
+    });
     const perm = await handle.requestPermission({mode:'readwrite'});
     if(perm!=='granted'){ showToast('Write permission denied', true); return; }
     fileHandle = handle;
