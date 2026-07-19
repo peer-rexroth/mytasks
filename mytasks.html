@@ -463,6 +463,11 @@
   .modal input, .modal select { width: 100%; border: 0.5px solid var(--border); border-radius: var(--radius); padding: 8px 12px; font-size: 14px; background: var(--bg-2); color: var(--text); outline: none; font-family: var(--font); }
   .modal input:focus { border-color: var(--border-2); }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+  .import-options { display: flex; flex-direction: column; gap: 8px; }
+  .import-option { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 0.5px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: background 0.1s; }
+  .import-option:hover { background: var(--bg-2); }
+  .import-option-text strong { display: block; font-size: 13px; font-weight: 500; }
+  .import-option-text span { font-size: 12px; color: var(--text-2); }
   .help-row { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text-2); line-height: 1.5; margin-bottom: 12px; }
   .help-row i { width: 16px; margin-top: 2px; color: var(--text-3); }
   .help-tip { font-size: 12px; color: var(--text-3); background: var(--bg-2); border-radius: var(--radius); padding: 10px 12px; line-height: 1.6; }
@@ -775,14 +780,52 @@
   </div>
 </div>
 
-<!-- Link file prompt modal -->
-<div class="modal-bg" id="linkPromptModalBg" onclick="if(event.target===this) dismissLinkPrompt()">
-  <div class="modal">
-    <h3 id="linkPromptTitle">Save your tasks to a file?</h3>
-    <p id="linkPromptBody">No file is linked yet, so your tasks only live in this browser. Link a file to auto-save every change, so your data survives even if browser storage is cleared.</p>
-    <div class="modal-actions" id="linkPromptActions" style="justify-content:flex-start"></div>
-    <div class="modal-actions" style="justify-content:flex-start;margin-top:-6px">
-      <button class="btn" onclick="dismissLinkPrompt()">Use browser storage only</button>
+<!-- File sync onboarding modal -->
+<div class="modal-bg" id="fileSyncModalBg" onclick="if(event.target===this) closeFileSyncModal()">
+  <div class="modal" style="width:380px;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <i class="fa-solid fa-link" style="font-size:18px;color:var(--blue-text)"></i>
+      <div>
+        <div style="font-size:15px;font-weight:500">Sync to a file</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:2px">Back up and share your tasks across sessions</div>
+      </div>
+    </div>
+    <div style="height:0.5px;background:var(--border)"></div>
+    <div class="import-options">
+      <div id="fileSyncReconnectOption" class="import-option" style="display:none" onclick="closeFileSyncModal();reconnectFile()">
+        <div style="width:34px;height:34px;border-radius:8px;background:var(--teal-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="fa-solid fa-rotate-right" style="color:var(--teal-text);font-size:15px"></i>
+        </div>
+        <div class="import-option-text">
+          <strong id="fileSyncReconnectLabel">Resume sync</strong>
+          <span>Reconnect to restore auto-saving</span>
+        </div>
+      </div>
+      <div class="import-option" onclick="closeFileSyncModal();linkFile()">
+        <div style="width:34px;height:34px;border-radius:8px;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="fa-solid fa-folder-open" style="color:var(--blue-text);font-size:15px"></i>
+        </div>
+        <div class="import-option-text">
+          <strong>Link existing file</strong>
+          <span>Open a .json data file and sync to it</span>
+        </div>
+      </div>
+      <div class="import-option" onclick="closeFileSyncModal();createNewLinkedFile()">
+        <div style="width:34px;height:34px;border-radius:8px;background:var(--green-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="fa-solid fa-file-circle-plus" style="color:var(--green-text);font-size:15px"></i>
+        </div>
+        <div class="import-option-text">
+          <strong>Create new file</strong>
+          <span>Save your tasks to a new .json file</span>
+        </div>
+      </div>
+    </div>
+    <div id="fileSyncWarning" style="display:flex;align-items:flex-start;gap:8px;background:var(--amber-bg);border-radius:var(--radius);padding:10px 12px">
+      <i class="fa-solid fa-triangle-exclamation" style="color:var(--amber-text);font-size:13px;margin-top:2px;flex-shrink:0"></i>
+      <span style="font-size:12px;color:var(--amber-text);line-height:1.55">Without a linked file, your tasks are stored in browser storage and <strong>will be lost if you clear browsing data</strong>.</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeFileSyncModal()">Not now</button>
     </div>
   </div>
 </div>
@@ -2582,23 +2625,21 @@ function setColorScheme(scheme){
   renderThemeModal();
   save();
 }
-function showLinkPromptModal(mode, fileName){
-  const bg = document.getElementById('linkPromptModalBg'); if(!bg) return;
-  const actions = document.getElementById('linkPromptActions');
-  if(mode==='reconnect'){
-    document.getElementById('linkPromptTitle').textContent = 'Reconnect your linked file?';
-    document.getElementById('linkPromptBody').textContent = `"${fileName}" was linked for auto-save, but this browser needs permission again after restarting. Reconnect to resume auto-saving.`;
-    actions.innerHTML = `<button class="btn btn-primary" onclick="reconnectFile();dismissLinkPrompt()"><i class="fa-solid fa-rotate"></i> Reconnect to ${esc(fileName)}</button>`;
+function openFileSyncModal(reconnectHandle){
+  const ro = document.getElementById('fileSyncReconnectOption');
+  const rl = document.getElementById('fileSyncReconnectLabel');
+  const warn = document.getElementById('fileSyncWarning');
+  if(reconnectHandle){
+    ro.style.display = 'flex';
+    rl.textContent = `Resume sync with ${reconnectHandle.name}`;
+    warn.style.display = 'none';
   } else {
-    document.getElementById('linkPromptTitle').textContent = 'Save your tasks to a file?';
-    document.getElementById('linkPromptBody').textContent = 'No file is linked yet, so your tasks only live in this browser. Link a file to auto-save every change, so your data survives even if browser storage is cleared.';
-    actions.innerHTML = `
-      <button class="btn btn-primary" onclick="createNewLinkedFile();dismissLinkPrompt()"><i class="fa-solid fa-file-circle-plus"></i> Create new file</button>
-      <button class="btn" onclick="linkFile();dismissLinkPrompt()"><i class="fa-solid fa-folder-open"></i> Link existing file</button>`;
+    ro.style.display = 'none';
+    warn.style.display = 'flex';
   }
-  bg.classList.add('open');
+  document.getElementById('fileSyncModalBg').classList.add('open');
 }
-function dismissLinkPrompt(){ document.getElementById('linkPromptModalBg')?.classList.remove('open'); }
+function closeFileSyncModal(){ document.getElementById('fileSyncModalBg')?.classList.remove('open'); }
 function toggleLibMenu(){ document.getElementById('libMenu')?.classList.toggle('open'); }
 function closeLibMenu(){ document.getElementById('libMenu')?.classList.remove('open'); }
 
@@ -3140,7 +3181,7 @@ async function initFileSync(){
   updateFileSyncUI();
   try{
     const handle = await _fsGet();
-    if(!handle){ showLinkPromptModal(); return; }
+    if(!handle){ openFileSyncModal(); return; }
     fileHandle = handle;
     const perm = await handle.queryPermission({mode:'readwrite'});
     if(perm==='granted'){
@@ -3156,14 +3197,14 @@ async function initFileSync(){
         }
       }catch(_){ /* read failed — keep localStorage data */ }
     } else {
-      showLinkPromptModal('reconnect', handle.name);
+      openFileSyncModal(handle);
     }
     updateFileSyncUI();
   }catch(e){
     fileHandle = null;
     _fsDel().catch(()=>{});
     updateFileSyncUI();
-    showLinkPromptModal();
+    openFileSyncModal();
   }
 }
 
