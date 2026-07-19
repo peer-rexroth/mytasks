@@ -882,8 +882,16 @@ function defaultProjects(){
   return [
     {id:'proj-inbox',    name:'Inbox',    icon:'inbox', locked:true},
     {id:'proj-work',     name:'Work',     icon:'briefcase'},
-    {id:'proj-personal', name:'Personal', icon:'house'}
+    {id:'proj-personal', name:'Personal', icon:'house'},
+    {id:'proj-deleted',  name:'Deleted',  icon:'trash', locked:true}
   ];
+}
+// proj-deleted holds completed tasks whose project was deleted. It's a real
+// project (so projectId stays valid and the task is still queryable from
+// All Tasks/search) but is deliberately left out of any UI that lists
+// projects for display or assignment — see visibleProjects().
+function visibleProjects(){
+  return projects.filter(p=>p.id!=='proj-deleted');
 }
 function defaultTasks(){
   const now = Date.now();
@@ -924,6 +932,7 @@ function normalizeData(){
   });
   projects.forEach(p=>{ if(!p.icon) p.icon='folder'; });
   if(!projects.find(p=>p.id==='proj-inbox')) projects.unshift({id:'proj-inbox',name:'Inbox',icon:'inbox',locked:true});
+  if(!projects.find(p=>p.id==='proj-deleted')) projects.push({id:'proj-deleted',name:'Deleted',icon:'trash',locked:true});
 }
 function load(){
   try{
@@ -1146,7 +1155,7 @@ function renderSidebar(){
     return `<div class="f-chip ${active?'active':''}" style="${active?`background:${tc.bg};color:${tc.text};border-color:${tc.text}`:''}" role="button" tabindex="0" aria-pressed="${active}" onclick="setTagFilter('${tg.id}')">${esc(tg.label)}</div>`;
   }).join('');
 
-  document.getElementById('projectList').innerHTML = projects.map(p=>{
+  document.getElementById('projectList').innerHTML = visibleProjects().map(p=>{
     return `<div class="project-row ${filterProjectId===p.id?'active':''}" data-id="${p.id}" role="button" tabindex="0" aria-pressed="${filterProjectId===p.id}" onclick="setProjectFilter('${p.id}')"
       ${p.locked ? '' : `draggable="true" ondragstart="handleProjectDragStart(event,'${p.id}')" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,'${p.id}')" ondragleave="handleProjectDragLeave(event)" ondrop="handleProjectDrop(event,'${p.id}')"`}>
       <i class="fa-solid fa-${p.icon||'folder'} picon"></i>
@@ -1347,7 +1356,7 @@ function boardCardHtml(t){
 function getBoardColumns(){
   const filtered = tasks.filter(t=>taskMatchesFilters(t, {ignoreProject:true}));
   const cmp = sortComparators[sortBy] || sortComparators.smart;
-  return projects.map(p=>{
+  return visibleProjects().map(p=>{
     const sorted = filtered.filter(t=>t.projectId===p.id).sort(doneLastComparator(cmp));
     const { tasks: visible, hiddenCount, doneTotal } = capCompleted(sorted, expandedCompletedProjects.has(p.id));
     return { project: p, tasks: visible, allCount: sorted.length, hiddenCount, doneTotal };
@@ -1527,7 +1536,7 @@ function renderBulkBar(){
   bar.classList.add('show');
   const statusOpts = STATUSES.map(s=>`<option value="${s.id}">${esc(s.label)}</option>`).join('');
   const priorityOpts = PRIORITIES.map(p=>`<option value="${p.id}">${esc(p.label)}</option>`).join('');
-  const projectOpts = projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  const projectOpts = visibleProjects().map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
   const repeatOpts = REPEATS.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('');
   const n = selectedTaskIds.size;
   bar.innerHTML = `
@@ -1571,6 +1580,7 @@ function bulkSetPriority(priority){
   });
 }
 function bulkMoveProject(projectId){
+  if(projectId==='proj-deleted') return; // system-managed, not user-assignable
   const ids = [...selectedTaskIds];
   const prev = ids.map(id=>{ const t=tasks.find(x=>x.id===id); return t?{id, projectId:t.projectId}:null; }).filter(Boolean);
   ids.forEach(id=>{ const t=tasks.find(x=>x.id===id); if(t){ t.projectId=projectId; t.updatedAt=Date.now(); } });
@@ -1640,7 +1650,7 @@ function renderDrawer(){
 
   overlay.classList.add('open'); drawer.classList.add('open');
 
-  const projOptions = projects.map(p=>`<option value="${p.id}" ${p.id===t.projectId?'selected':''}${p.name.length>15?` title="${esc(p.name)}"`:''}>${esc(abbreviateName(p.name, 15))}</option>`).join('');
+  const projOptions = visibleProjects().map(p=>`<option value="${p.id}" ${p.id===t.projectId?'selected':''}${p.name.length>15?` title="${esc(p.name)}"`:''}>${esc(abbreviateName(p.name, 15))}</option>`).join('');
   const statusOptions = STATUSES.map(s=>`<option value="${s.id}" ${s.id===t.status?'selected':''}>${esc(s.label)}</option>`).join('');
   const priorityOptions = PRIORITIES.map(p=>`<option value="${p.id}" ${p.id===t.priority?'selected':''}>${esc(p.label)}</option>`).join('');
   const repeatOptions = REPEATS.map(r=>`<option value="${r.id}" ${r.id===(t.repeat||'none')?'selected':''}>${esc(r.label)}</option>`).join('');
@@ -1866,6 +1876,7 @@ function toggleTaskDone(id){
   const goingDone = t.status!=='done';
   t.status = goingDone ? 'done' : 'todo';
   t.completedAt = goingDone ? Date.now() : null;
+  if(!goingDone && t.projectId==='proj-deleted') t.projectId = 'proj-inbox';
   t.updatedAt = Date.now();
   if(goingDone) justCompletedTaskId = id;
   save(); render();
@@ -1874,6 +1885,7 @@ function toggleTaskDone(id){
 
 function updateTaskField(id, field, value){
   const t = tasks.find(x=>x.id===id); if(!t) return;
+  if(field==='projectId' && value==='proj-deleted') return; // system-managed, not user-assignable
   if(field==='status' && value==='done' && t.status!=='done' && t.repeat && t.repeat!=='none'){
     toggleTaskDone(id);
     return;
@@ -1887,6 +1899,7 @@ function updateTaskField(id, field, value){
   }
   if(field==='status'){
     t.completedAt = value==='done' ? Date.now() : null;
+    if(value!=='done' && t.projectId==='proj-deleted') t.projectId = 'proj-inbox';
   }
   t.updatedAt = Date.now();
   save(); render();
@@ -2237,15 +2250,27 @@ function saveProjectModal(){
 }
 function deleteProject(id){
   const p = projById(id); if(!p || p.locked) return;
+  const projTasks = tasks.filter(t=>t.projectId===id);
+  const activeCount = projTasks.filter(t=>t.status!=='done').length;
+  const doneCount = projTasks.length - activeCount;
+  const bodyParts = [];
+  if(activeCount>0) bodyParts.push(`${activeCount} active task${activeCount===1?'':'s'} will move to Inbox for triage`);
+  if(doneCount>0) bodyParts.push(`${doneCount} completed task${doneCount===1?'':'s'} will stay done, out of Inbox's view`);
+  const body = (bodyParts.length ? bodyParts.join('; ') + '. ' : '') + 'You can undo this from the toast right after deleting.';
   openConfirmModal({
     title: `Delete "${p.name}"?`,
-    body: 'Tasks in this project will be moved to Inbox. You can undo this from the toast right after deleting.',
+    body,
     action: ()=>{
       const idx = projects.findIndex(x=>x.id===id);
       if(idx===-1) return;
       const [removed] = projects.splice(idx,1);
       const movedTaskIds = [];
-      tasks.forEach(t=>{ if(t.projectId===id){ movedTaskIds.push(t.id); t.projectId='proj-inbox'; } });
+      tasks.forEach(t=>{
+        if(t.projectId===id){
+          movedTaskIds.push(t.id);
+          t.projectId = t.status==='done' ? 'proj-deleted' : 'proj-inbox';
+        }
+      });
       if(filterProjectId===id) filterProjectId=null;
       save(); render();
       showToast('Project deleted', false, ()=>{

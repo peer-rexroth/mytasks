@@ -1,9 +1,11 @@
 // Board view is grouped by project (not status) — getBoardColumns() maps
-// one column per project, and dropping a card sets projectId, not status.
+// one column per visible project, and dropping a card sets projectId, not
+// status. proj-deleted is a real project (see visibleProjects() in
+// delete-project.test.js) but intentionally gets no column.
 
-test('getBoardColumns returns one column per project, in project order', function () {
+test('getBoardColumns returns one column per visible project, in order', function () {
   const cols = getBoardColumns();
-  assertDeepEqual(cols.map(c => c.project.id), projects.map(p => p.id));
+  assertDeepEqual(cols.map(c => c.project.id), visibleProjects().map(p => p.id));
 });
 
 test('getBoardColumns ignores the project filter within each column (ignoreProject)', function () {

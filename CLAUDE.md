@@ -82,6 +82,38 @@ and don't assume `CAT_COLORS` needs all 8 original hues restored.
 and priority visuals are driven by CSS classes (`badge-status-*`,
 `badge-priority-*`), not inline colors from these arrays.
 
+### `proj-inbox` / `proj-deleted` — locked, system-managed projects
+
+Both are real entries in `projects` (created by `defaultProjects()`,
+recreated by `normalizeData()` if a save is missing one), not sentinel
+values — every task's `projectId` always resolves via `projById()`.
+`locked: true` on either just means "no delete button" (`deleteProject()`
+early-returns for a locked project); it does **not** control visibility.
+
+`proj-deleted` is additionally hidden from every place that lists or offers
+projects — sidebar, board columns, the drawer's project `<select>`, and the
+bulk-move dropdown — via `visibleProjects()` (`projects` minus
+`proj-deleted`). Any new UI that iterates `projects` to list/assign them
+should go through `visibleProjects()` instead, the same way the four
+existing spots do, or it'll leak a "Deleted" option/column into the UI.
+
+`deleteProject()` splits a deleted project's tasks by status: active tasks
+move to `proj-inbox` (need triage, same as any other Inbox task); completed
+tasks move to `proj-deleted` instead, so they don't clutter the Inbox
+list/board with old done work — they're still reachable from All Tasks,
+My Day, This Week, Overdue, and search, since those don't filter by
+project. `updateTaskField()` refuses `projectId: 'proj-deleted'` and
+`bulkMoveProject()` refuses `'proj-deleted'` as a target, as defense in
+depth (`visibleProjects()` already keeps it out of every picker, so neither
+guard should be reachable through the UI — but both are cheap and this is
+exactly the kind of state a future picker could reintroduce by iterating
+`projects` directly instead of `visibleProjects()`).
+
+Un-completing a task that's sitting in `proj-deleted` (via the checkbox —
+`toggleTaskDone()` — or the drawer's status `<select>` —
+`updateTaskField(id,'status',...)`) reassigns it to `proj-inbox`, since a
+not-done task needs triage and `proj-deleted` is done-only by convention.
+
 ## Views and where features live
 
 There are three surfaces that can show a task's subtasks/steps, and they are
