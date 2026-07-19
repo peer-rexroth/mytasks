@@ -838,6 +838,13 @@ const MAX_BACKUPS = 7;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let projects = [], tasks = [];
+// Tombstones: {id, deletedAt} for tasks/projects removed locally. Without
+// these, mergeData() (and anything that reads a linked file) can't tell
+// "never seen this id" from "saw it, user deleted it" — an id absent from
+// the local array looks identical either way, so a stale copy elsewhere
+// (an old linked file, another device) gets treated as new and silently
+// resurrects it. See mergeData() for how these gate re-adding an id.
+let deletedTaskIds = [], deletedProjectIds = [];
 let activeTaskId = null;
 let kbdSelectedTaskId = null;
 let renamingTaskId = null;
@@ -933,6 +940,10 @@ function normalizeData(){
   projects.forEach(p=>{ if(!p.icon) p.icon='folder'; });
   if(!projects.find(p=>p.id==='proj-inbox')) projects.unshift({id:'proj-inbox',name:'Inbox',icon:'inbox',locked:true});
   if(!projects.find(p=>p.id==='proj-deleted')) projects.push({id:'proj-deleted',name:'Deleted',icon:'trash',locked:true});
+  if(!Array.isArray(deletedTaskIds)) deletedTaskIds=[];
+  if(!Array.isArray(deletedProjectIds)) deletedProjectIds=[];
+  deletedTaskIds = deletedTaskIds.filter(x=>x && x.id);
+  deletedProjectIds = deletedProjectIds.filter(x=>x && x.id);
 }
 function load(){
   try{
@@ -941,6 +952,8 @@ function load(){
       const d = JSON.parse(raw);
       projects = d.projects || defaultProjects();
       tasks = d.tasks || defaultTasks();
+      deletedTaskIds = d.deletedTaskIds || [];
+      deletedProjectIds = d.deletedProjectIds || [];
       sortBy = d.sortBy || 'smart';
       if(d.theme){ currentTheme=d.theme; document.documentElement.setAttribute('data-theme',d.theme); localStorage.setItem(THEME_KEY,d.theme); }
       if(d.colorScheme && THEME_SCHEMES.some(x=>x.id===d.colorScheme)){ colorScheme=d.colorScheme; document.documentElement.setAttribute('data-scheme',d.colorScheme); localStorage.setItem(SCHEME_KEY,d.colorScheme); }
@@ -957,7 +970,7 @@ function load(){
   }
 }
 function save(){
-  const data = { projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, colorScheme, compactMode, viewMode };
+  const data = { projects, tasks, deletedTaskIds, deletedProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, colorScheme, compactMode, viewMode };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(fileHandle) fileSyncWrite(data).catch(()=>{});
   maybeSnapshotBackup();
@@ -984,9 +997,15 @@ function maybeSnapshotBackup(){
 function purgeOldCompletedTasks(){
   const cutoff = Date.now() - COMPLETED_RETENTION_DAYS*24*60*60*1000;
   const before = tasks.length;
-  tasks = tasks.filter(t=>!(t.status==='done' && t.completedAt && t.completedAt < cutoff));
+  const purged = [];
+  tasks = tasks.filter(t=>{
+    const stale = t.status==='done' && t.completedAt && t.completedAt < cutoff;
+    if(stale) purged.push(t);
+    return !stale;
+  });
   const removed = before - tasks.length;
   if(removed>0){
+    purged.forEach(t=>tombstone(deletedTaskIds, t.id));
     save();
     showToast(`Cleaned up ${removed} task${removed===1?'':'s'} completed over ${COMPLETED_RETENTION_DAYS} days ago`);
   }
@@ -995,6 +1014,15 @@ function purgeOldCompletedTasks(){
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function tombstone(list, id){
+  const existing = list.find(x=>x.id===id);
+  if(existing) existing.deletedAt = Date.now();
+  else list.push({id, deletedAt: Date.now()});
+}
+function untombstone(list, id){
+  const idx = list.findIndex(x=>x.id===id);
+  if(idx!==-1) list.splice(idx,1);
+}
 function normFilterArr(v, allIds){ if(Array.isArray(v)) return v; if(v) return [v]; return allIds; }
 function normStatusFilter(v){ return normFilterArr(v, STATUSES.map(s=>s.id)); }
 function normPriorityFilter(v){ return normFilterArr(v, PRIORITIES.map(p=>p.id)); }
@@ -1629,11 +1657,13 @@ function bulkDelete(){
         if(idx!==-1) removed.push({idx, task:tasks[idx]});
       });
       removed.slice().sort((a,b)=>b.idx-a.idx).forEach(r=>tasks.splice(r.idx,1));
+      removed.forEach(r=>tombstone(deletedTaskIds, r.task.id));
       if(activeTaskId && ids.includes(activeTaskId)) activeTaskId=null;
       if(kbdSelectedTaskId && ids.includes(kbdSelectedTaskId)) kbdSelectedTaskId=null;
       selectedTaskIds.clear();
       save(); render();
       showToast(`${removed.length} task${removed.length===1?'':'s'} deleted`, false, ()=>{
+        removed.forEach(r=>untombstone(deletedTaskIds, r.task.id));
         removed.slice().sort((a,b)=>a.idx-b.idx).forEach(r=>tasks.splice(Math.min(r.idx,tasks.length),0,r.task));
         save(); render();
         showToast('Tasks restored');
@@ -1951,10 +1981,12 @@ function deleteTask(id){
         const idx = tasks.findIndex(t=>t.id===id);
         if(idx===-1) return;
         const [removed] = tasks.splice(idx,1);
+        tombstone(deletedTaskIds, id);
         if(activeTaskId===id) activeTaskId=null;
         if(kbdSelectedTaskId===id) kbdSelectedTaskId=null;
         save(); render();
         showToast('Task deleted', false, ()=>{
+          untombstone(deletedTaskIds, id);
           tasks.splice(idx,0,removed);
           save(); render();
           showToast('Task restored');
@@ -2264,6 +2296,7 @@ function deleteProject(id){
       const idx = projects.findIndex(x=>x.id===id);
       if(idx===-1) return;
       const [removed] = projects.splice(idx,1);
+      tombstone(deletedProjectIds, id);
       const movedTaskIds = [];
       tasks.forEach(t=>{
         if(t.projectId===id){
@@ -2274,6 +2307,7 @@ function deleteProject(id){
       if(filterProjectId===id) filterProjectId=null;
       save(); render();
       showToast('Project deleted', false, ()=>{
+        untombstone(deletedProjectIds, id);
         projects.splice(idx,0,removed);
         movedTaskIds.forEach(tid=>{ const t=tasks.find(x=>x.id===tid); if(t) t.projectId=id; });
         save(); render();
@@ -2833,15 +2867,41 @@ function handleFileImport(event){
   reader.readAsText(file);
   event.target.value = '';
 }
+// Additive merge used by every "read data from outside localStorage" path
+// (linkFile, reconnectFile, initFileSync, fileSyncWrite's cross-tab merge).
+// Tombstones (deletedTaskIds/deletedProjectIds) are what let this tell "never
+// seen this id" apart from "saw it, user deleted it" — without them, an id
+// that's merely absent from the local array looks new either way, so a stale
+// copy from an old linked file or another device gets silently re-added.
+// Incoming tombstones are merged in the same pass so a deletion recorded on
+// one device/file propagates to whichever side is doing the reading.
 function mergeData(data){
   let added=0, updated=0;
+  (data.deletedProjectIds||[]).forEach(dp=>{
+    const existing = deletedProjectIds.find(x=>x.id===dp.id);
+    if(!existing) deletedProjectIds.push({id:dp.id, deletedAt:dp.deletedAt||Date.now()});
+    else if((dp.deletedAt||0) > existing.deletedAt) existing.deletedAt = dp.deletedAt;
+  });
+  (data.deletedTaskIds||[]).forEach(dt=>{
+    const existing = deletedTaskIds.find(x=>x.id===dt.id);
+    if(!existing) deletedTaskIds.push({id:dt.id, deletedAt:dt.deletedAt||Date.now()});
+    else if((dt.deletedAt||0) > existing.deletedAt) existing.deletedAt = dt.deletedAt;
+  });
   (data.projects||[]).forEach(ip=>{
-    if(!projects.find(p=>p.id===ip.id || p.name.toLowerCase()===ip.name.toLowerCase())) projects.push(ip);
+    if(projects.find(p=>p.id===ip.id || p.name.toLowerCase()===ip.name.toLowerCase())) return;
+    if(deletedProjectIds.some(x=>x.id===ip.id)) return;
+    projects.push(ip);
   });
   (data.tasks||[]).forEach(it=>{
     const existing = tasks.find(t=>t.id===it.id);
-    if(!existing){ tasks.push(it); added++; }
-    else if((it.updatedAt||0) > (existing.updatedAt||0)){ Object.assign(existing, it); updated++; }
+    if(existing){
+      if((it.updatedAt||0) > (existing.updatedAt||0)){ Object.assign(existing, it); updated++; }
+      return;
+    }
+    const tomb = deletedTaskIds.find(x=>x.id===it.id);
+    if(tomb && tomb.deletedAt >= (it.updatedAt||0)) return; // stays deleted — the incoming copy is stale
+    if(tomb) untombstone(deletedTaskIds, it.id); // incoming edit is newer than our deletion — let it back in
+    tasks.push(it); added++;
   });
   return {added, updated};
 }
@@ -2987,7 +3047,7 @@ async function createNewLinkedFile(){
     });
     fileHandle = handle;
     try{ await _fsPut(handle); }catch(_){}
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode});
+    await fileSyncWrite({projects, tasks, deletedTaskIds, deletedProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not create file', true); }
@@ -3019,7 +3079,7 @@ async function linkFile(){
       }
       return;
     }
-    await fileSyncWrite({projects, tasks, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode});
+    await fileSyncWrite({projects, tasks, deletedTaskIds, deletedProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not link file', true); }
@@ -3036,7 +3096,7 @@ async function reconnectFile(){
     const text = await (await fileHandle.getFile()).text();
     const data = JSON.parse(text);
     if(data.tasks && data.projects){
-      projects = data.projects; tasks = data.tasks;
+      const {added, updated} = mergeData(data);
       if(data.filterProjectId!==undefined) filterProjectId = data.filterProjectId;
       if(data.filterStatus!==undefined) filterStatus = normStatusFilter(data.filterStatus);
       if(data.filterPriority!==undefined) filterPriority = normPriorityFilter(data.filterPriority);
@@ -3047,7 +3107,11 @@ async function reconnectFile(){
       normalizeData();
       lastSyncedSnapshot = text;
       purgeOldCompletedTasks();
-      render();
+      save(); render();
+      updateFileSyncUI();
+      const parts=[]; if(added) parts.push(`${added} added`); if(updated) parts.push(`${updated} updated`);
+      showToast(`Reconnected to ${fileHandle.name}${parts.length?` — ${parts.join(', ')}`:''}`);
+      return;
     }
     updateFileSyncUI();
     showToast(`Reconnected to ${fileHandle.name}`);
@@ -3095,11 +3159,11 @@ async function initFileSync(){
         const text = await (await handle.getFile()).text();
         const data = JSON.parse(text);
         if(data.tasks && data.projects){
-          projects = data.projects; tasks = data.tasks;
+          mergeData(data);
           normalizeData();
           lastSyncedSnapshot = text;
           purgeOldCompletedTasks();
-          render();
+          save(); render();
         }
       }catch(_){ /* read failed — keep localStorage data */ }
     } else {

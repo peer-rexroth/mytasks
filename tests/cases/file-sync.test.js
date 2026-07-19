@@ -9,6 +9,11 @@
 
 test('reconnectFile() migrates old-schema data instead of leaving it unnormalized', async function () {
   // Old export predating steps/project-icons: no subtasks array, no icon.
+  // Start from an empty local library — reconnectFile() now merges rather
+  // than overwrites, so a pre-existing local 't1'/'proj-inbox' would just
+  // win the merge and this test wouldn't actually exercise the incoming
+  // file's data at all.
+  projects = []; tasks = [];
   const oldSchemaJson = JSON.stringify({
     projects: [{ id: 'proj-inbox', name: 'Inbox', locked: true }],
     tasks: [{ id: 't1', title: 'From a reconnected file', projectId: 'proj-inbox', subtasks: [{ id: 's1', text: 'legacy step' }] }]

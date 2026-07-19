@@ -1,7 +1,7 @@
 # mytasks
 
 A single-file task manager PWA. Everything — HTML, CSS, and JS — lives in
-`mytasks.html` (~3,100 lines). There is no build step, no bundler, no
+`mytasks.html` (~3,200 lines). There is no build step, no bundler, no
 dependencies beyond a CDN Font Awesome link. Edit the file directly.
 
 ## Running it
@@ -199,6 +199,52 @@ cross-tab merge branch) — all four assigned `projects`/`tasks` from an
 external `.json` file without normalizing, so this is a mistake that's
 genuinely easy to repeat. If you add another data-loading path (e.g. a new
 sync mechanism), route it through `normalizeData()` too.
+
+## Deletion tombstones — why `mergeData()` can't just diff arrays
+
+`deletedTaskIds`/`deletedProjectIds` (each an array of `{id, deletedAt}`) are
+the record of "this id used to exist and was intentionally removed" —
+without them, an id absent from `tasks`/`projects` is indistinguishable from
+an id the app has simply never seen. `mergeData()` (used by the same four
+spots as the section above — `linkFile()`, `reconnectFile()`,
+`initFileSync()`, `fileSyncWrite()`'s cross-tab merge branch — since they're
+all "read data from outside `localStorage`") is additive by id: an incoming
+task/project not currently in the local array gets pushed in as new. Before
+tombstones existed, that meant any of those four merge points could
+resurrect a task/project the user had already deleted, simply because a
+stale copy was still sitting in the linked file or on another device (the
+bundled `defaultTasks()` demo tasks reappearing after "Reconnect" was the bug
+report that surfaced this). `reconnectFile()`/`initFileSync()` used to do a
+raw overwrite (`tasks = data.tasks`) rather than merge at all, which had the
+same resurrection failure mode plus a second one — it could silently discard
+local edits that hadn't made it to the file yet (e.g. during a permission
+lapse). Both now route through `mergeData()`.
+
+`deleteTask()`/`bulkDelete()`/`deleteProject()` call `tombstone(list, id)`
+when removing something, and `untombstone(list, id)` in their toast undo
+callback — the tombstone must not outlive the undo window, or undoing a
+delete would restore the task/project locally while it stays permanently
+un-mergeable from any file that still has it. `purgeOldCompletedTasks()`
+(the retention-window auto-cleanup) tombstones what it purges too, since
+that's the same "no longer in `tasks`" fact as a manual delete.
+
+Inside `mergeData()`, tombstones only gate the *not-found-locally* branch —
+if a task's id already exists locally, normal newer-`updatedAt`-wins logic
+applies (deleted-then-not-existing-locally and existing-locally-right-now
+are mutually exclusive states). A tombstoned id is skipped unless the
+incoming copy's `updatedAt` is newer than the tombstone's `deletedAt`, in
+which case it's treated as a genuine edit made elsewhere *after* the local
+delete and is let back in (clearing the stale tombstone) — same
+last-write-wins spirit as the rest of the merge, rather than a delete being
+permanent no matter what happens on another device. Projects have no
+`updatedAt` field, so a project tombstone has no such escape hatch: once
+deleted, a project's id is never merged back in by `mergeData()` alone.
+
+`mergeData()` also merges *incoming* `deletedTaskIds`/`deletedProjectIds`
+into the local lists (union by id, keeping the later `deletedAt`), so a
+deletion recorded on one device/file propagates to whichever side is doing
+the reading — this is what lets tombstones do their job bidirectionally
+instead of only protecting the device that performed the delete.
 
 ## Color scheme system
 
