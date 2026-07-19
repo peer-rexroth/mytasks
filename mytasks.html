@@ -3186,7 +3186,7 @@ render();
 initFileSync();
 
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
-  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(e=>console.warn('mytasks: service worker registration failed — offline support unavailable', e)); });
 }
 </script>
 </body>
