@@ -54,10 +54,13 @@ test('allTasksHiddenProjectIds is ignored in My Day/This Week/Overdue smart view
   assertTrue(taskMatchesFilters(tasks[0]), 'smart views should not be affected by the All Tasks project selection');
 });
 
-test('allTasksHiddenProjectIds is ignored by board view (ignoreProject)', function () {
+test('taskMatchesFilters itself does not apply allTasksHiddenProjectIds when ignoreProject is set', function () {
+  // Board view enforces the hidden set at the column level (getBoardColumns()
+  // drops the column entirely — see board.test.js), not per-task here, so
+  // this function-level check must stay a no-op under ignoreProject.
   tasks = [filterFixtureTask()];
   allTasksHiddenProjectIds = ['proj-personal'];
-  assertTrue(taskMatchesFilters(tasks[0], { ignoreProject: true }), 'board view shows every project as its own column regardless of the All Tasks selection');
+  assertTrue(taskMatchesFilters(tasks[0], { ignoreProject: true }));
 });
 
 test('toggleAllTasksProject adds and removes a project from the hidden list', function () {

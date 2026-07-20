@@ -643,7 +643,7 @@
       <div class="nav-item" id="allTasksNav" role="button" tabindex="0" aria-pressed="false" onclick="setProjectFilter(null)">
         <span><i class="fa-solid fa-inbox" style="width:14px;color:var(--text-3);margin-right:6px"></i>All Tasks</span>
         <span style="display:flex;align-items:center;gap:2px">
-          <button class="icon-btn" onclick="event.stopPropagation();openAllTasksProjectsModal()" title="Choose which projects appear in All Tasks"><i class="fa-solid fa-sliders"></i></button>
+          <button class="icon-btn" onclick="event.stopPropagation();openAllTasksProjectsModal()" title="Choose which projects appear in All Tasks and on the board"><i class="fa-solid fa-sliders"></i></button>
           <span class="count" id="allTasksCount"></span>
         </span>
       </div>
@@ -868,8 +868,8 @@
 <!-- All Tasks projects modal -->
 <div class="modal-bg" id="allTasksProjectsModalBg" onclick="if(event.target===this) closeAllModals()">
   <div class="modal" style="width:360px">
-    <h3>Projects in All Tasks</h3>
-    <p style="font-size:12px;color:var(--text-3);margin-top:-8px">Choose which projects' tasks show up in the All Tasks view.</p>
+    <h3>Projects shown</h3>
+    <p style="font-size:12px;color:var(--text-3);margin-top:-8px">Choose which projects' tasks show up in the All Tasks list and as board columns.</p>
     <div id="allTasksProjectsList" style="display:flex;flex-direction:column;gap:1px;max-height:320px;overflow-y:auto"></div>
     <div class="modal-actions"><button class="btn btn-primary" onclick="closeAllModals()">Done</button></div>
   </div>
@@ -1015,11 +1015,11 @@ let expandedCompletedProjects = new Set();
 let draggedItem = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id), filterTags = [];
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
-// Projects excluded from the "All Tasks" view specifically (not My Day/This
-// Week/Overdue, and not board view, which always shows every project as its
-// own column regardless). An exclusion list rather than an inclusion
-// whitelist so a newly created project defaults to visible instead of
-// silently missing from All Tasks until someone remembers to opt it in.
+// Projects excluded from the merged "All Tasks" list AND from board view's
+// columns (but not My Day/This Week/Overdue, and not while a project filter
+// is active in list view — see taskMatchesFilters()). An exclusion list
+// rather than an inclusion whitelist so a newly created project defaults to
+// visible instead of silently missing until someone remembers to opt it in.
 let allTasksHiddenProjectIds = [];
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
@@ -1381,8 +1381,9 @@ function taskMatchesFilters(t, opts){
   opts = opts || {};
   if(!opts.ignoreProject && filterProjectId && t.projectId!==filterProjectId) return false;
   // Only in the true "All Tasks" state (no project filter, no smart view) —
-  // board view passes ignoreProject:true and always shows every project as
-  // its own column regardless of this setting.
+  // board view passes ignoreProject:true here and enforces the same hidden
+  // set separately, by dropping the column entirely in getBoardColumns()
+  // rather than filtering individual tasks through this function.
   if(!opts.ignoreProject && !filterProjectId && !myDayFilter && !thisWeekFilter && !overdueFilter && allTasksHiddenProjectIds.includes(t.projectId)) return false;
   if(myDayFilter && t.dueDate!==todayStr()) return false;
   if(thisWeekFilter && !isThisWeek(t.dueDate)) return false;
@@ -1554,7 +1555,11 @@ function boardCardHtml(t){
 function getBoardColumns(){
   const filtered = tasks.filter(t=>taskMatchesFilters(t, {ignoreProject:true}));
   const cmp = sortComparators[sortBy] || sortComparators.smart;
-  return visibleProjects().map(p=>{
+  // allTasksHiddenProjectIds drops the column entirely (not just its tasks)
+  // — unlike filterProjectId, which only dims a column, this is meant to
+  // remove it from the board the same way it removes tasks from the merged
+  // All Tasks list.
+  return visibleProjects().filter(p=>!allTasksHiddenProjectIds.includes(p.id)).map(p=>{
     const sorted = filtered.filter(t=>t.projectId===p.id).sort(doneLastComparator(cmp));
     const { tasks: visible, hiddenCount, doneTotal } = capCompleted(sorted, expandedCompletedProjects.has(p.id));
     return { project: p, tasks: visible, allCount: sorted.length, hiddenCount, doneTotal };
@@ -2395,7 +2400,10 @@ function getVisibleTasksForCollapse(){
   // project filter (every column stays visible, just dimmed), not status.
   // Using the wrong axis here meant collapse-all only touched the active
   // project filter's column while every other visible column sat untouched.
-  return viewMode==='board' ? tasks.filter(t=>taskMatchesFilters(t, {ignoreProject:true})) : getFilteredSortedTasks();
+  // Also excludes allTasksHiddenProjectIds, same as getBoardColumns() itself
+  // dropping those columns — no point touching collapse state for tasks
+  // whose column isn't even rendered.
+  return viewMode==='board' ? tasks.filter(t=>taskMatchesFilters(t, {ignoreProject:true}) && !allTasksHiddenProjectIds.includes(t.projectId)) : getFilteredSortedTasks();
 }
 function toggleCollapseAllTasks(){
   const list = getVisibleTasksForCollapse();

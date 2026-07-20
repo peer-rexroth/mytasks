@@ -16,6 +16,18 @@ test('getBoardColumns ignores the project filter within each column (ignoreProje
   assertTrue(personalCol.tasks.length > 0, 'proj-personal column should still show its own tasks even though proj-work is the active filter');
 });
 
+test('getBoardColumns drops the column entirely for a project in allTasksHiddenProjectIds', function () {
+  allTasksHiddenProjectIds = ['proj-personal'];
+  const cols = getBoardColumns();
+  assertFalse(cols.some(c => c.project.id === 'proj-personal'), 'a hidden project should get no column at all, not just an empty one');
+});
+
+test('getBoardColumns keeps other columns when one project is hidden', function () {
+  allTasksHiddenProjectIds = ['proj-personal'];
+  const cols = getBoardColumns();
+  assertTrue(cols.some(c => c.project.id === 'proj-work'), 'other projects should be unaffected');
+});
+
 test('handleBoardDrop moves the dragged task to the target column\'s project, not its status', function () {
   tasks = [{ id: 't1', title: 'Inbox task', projectId: 'proj-inbox', status: 'todo', priority: 'medium', subtasks: [], tags: [] }];
   const t = tasks.find(x => x.projectId === 'proj-inbox');
@@ -35,6 +47,14 @@ test('getVisibleTasksForCollapse uses the same ignoreProject axis as getBoardCol
   filterProjectId = 'proj-work';
   const visible = getVisibleTasksForCollapse();
   assertTrue(visible.some(t => t.id === 't1'), 'a task in a non-filtered project column should still be reachable by collapse-all, since board view shows every column regardless of the project filter');
+});
+
+test('getVisibleTasksForCollapse excludes tasks whose column is hidden in board view', function () {
+  tasks = [{ id: 't1', title: 'Personal task', projectId: 'proj-personal', status: 'todo', priority: 'medium', subtasks: [], tags: [] }];
+  viewMode = 'board';
+  allTasksHiddenProjectIds = ['proj-personal'];
+  const visible = getVisibleTasksForCollapse();
+  assertFalse(visible.some(t => t.id === 't1'), 'collapse-all should not touch tasks whose column is not even rendered');
 });
 
 test('handleBoardDrop is a no-op when nothing is being dragged', function () {
