@@ -232,6 +232,12 @@
   .icon-btn { background: none; border: none; cursor: pointer; color: var(--text-3); font-size: 12px; padding: 3px 5px; border-radius: 5px; }
   .subtask-toggle { display: inline-block; flex-shrink: 0; font-size: 10px; padding: 2px 4px; width: 16px; box-sizing: border-box; }
   .icon-btn:hover { background: var(--bg-3); color: var(--text); }
+  .proj-select-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: var(--radius); cursor: pointer; font-size: 13px; }
+  .proj-select-row:hover { background: var(--bg-2); }
+  .proj-select-check { width: 17px; height: 17px; border-radius: 4px; border: 1.5px solid var(--border-2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: background-color .15s, border-color .15s; }
+  .proj-select-check.checked { background: var(--blue-text); border-color: var(--blue-text); }
+  .proj-select-check i { font-size: 9px; color: #fff; opacity: 0; transition: opacity .1s; }
+  .proj-select-check.checked i { opacity: 1; }
 
   /* split button */
   .split-btn { display: inline-flex; position: relative; border: 0.5px solid var(--border); border-radius: var(--radius); overflow: visible; }
@@ -636,7 +642,10 @@
     <div class="sidebar-section">
       <div class="nav-item" id="allTasksNav" role="button" tabindex="0" aria-pressed="false" onclick="setProjectFilter(null)">
         <span><i class="fa-solid fa-inbox" style="width:14px;color:var(--text-3);margin-right:6px"></i>All Tasks</span>
-        <span class="count" id="allTasksCount"></span>
+        <span style="display:flex;align-items:center;gap:2px">
+          <button class="icon-btn" onclick="event.stopPropagation();openAllTasksProjectsModal()" title="Choose which projects appear in All Tasks"><i class="fa-solid fa-sliders"></i></button>
+          <span class="count" id="allTasksCount"></span>
+        </span>
       </div>
       <div class="nav-item" id="myDayNav" role="button" tabindex="0" aria-pressed="false" onclick="setMyDayFilter()">
         <span><i class="fa-solid fa-sun" style="width:14px;color:var(--text-3);margin-right:6px"></i>My Day</span>
@@ -856,6 +865,16 @@
   </div>
 </div>
 
+<!-- All Tasks projects modal -->
+<div class="modal-bg" id="allTasksProjectsModalBg" onclick="if(event.target===this) closeAllModals()">
+  <div class="modal" style="width:360px">
+    <h3>Projects in All Tasks</h3>
+    <p style="font-size:12px;color:var(--text-3);margin-top:-8px">Choose which projects' tasks show up in the All Tasks view.</p>
+    <div id="allTasksProjectsList" style="display:flex;flex-direction:column;gap:1px;max-height:320px;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="closeAllModals()">Done</button></div>
+  </div>
+</div>
+
 <!-- Shortcuts modal -->
 <div class="modal-bg" id="shortcutsModalBg" onclick="if(event.target===this) closeAllModals()">
   <div class="modal" style="width:340px;gap:16px">
@@ -996,6 +1015,12 @@ let expandedCompletedProjects = new Set();
 let draggedItem = null;
 let filterProjectId = null, filterStatus = STATUSES.map(s=>s.id), filterPriority = PRIORITIES.map(p=>p.id), filterTags = [];
 let myDayFilter = false, thisWeekFilter = false, overdueFilter = false;
+// Projects excluded from the "All Tasks" view specifically (not My Day/This
+// Week/Overdue, and not board view, which always shows every project as its
+// own column regardless). An exclusion list rather than an inclusion
+// whitelist so a newly created project defaults to visible instead of
+// silently missing from All Tasks until someone remembers to opt it in.
+let allTasksHiddenProjectIds = [];
 let searchQuery = '', sortBy = 'smart';
 let currentTheme = 'light';
 let colorScheme = 'standard';
@@ -1072,6 +1097,8 @@ function normalizeData(){
   if(!Array.isArray(deletedProjectIds)) deletedProjectIds=[];
   deletedTaskIds = deletedTaskIds.filter(x=>x && x.id);
   deletedProjectIds = deletedProjectIds.filter(x=>x && x.id);
+  if(!Array.isArray(allTasksHiddenProjectIds)) allTasksHiddenProjectIds=[];
+  allTasksHiddenProjectIds = allTasksHiddenProjectIds.filter(id=>projects.some(p=>p.id===id));
 }
 function load(){
   try{
@@ -1082,6 +1109,7 @@ function load(){
       tasks = d.tasks || defaultTasks();
       deletedTaskIds = d.deletedTaskIds || [];
       deletedProjectIds = d.deletedProjectIds || [];
+      allTasksHiddenProjectIds = d.allTasksHiddenProjectIds || [];
       sortBy = d.sortBy || 'smart';
       if(d.theme){ currentTheme=d.theme; document.documentElement.setAttribute('data-theme',d.theme); localStorage.setItem(THEME_KEY,d.theme); }
       if(d.colorScheme && THEME_SCHEMES.some(x=>x.id===d.colorScheme)){ colorScheme=d.colorScheme; document.documentElement.setAttribute('data-scheme',d.colorScheme); localStorage.setItem(SCHEME_KEY,d.colorScheme); }
@@ -1098,7 +1126,7 @@ function load(){
   }
 }
 function save(){
-  const data = { projects, tasks, deletedTaskIds, deletedProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, colorScheme, compactMode, viewMode };
+  const data = { projects, tasks, deletedTaskIds, deletedProjectIds, allTasksHiddenProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, colorScheme, compactMode, viewMode };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(fileHandle) fileSyncWrite(data).catch(()=>{});
   maybeSnapshotBackup();
@@ -1290,7 +1318,7 @@ function setNavActive(id, active){
 }
 function renderSidebar(){
   setNavActive('allTasksNav', !filterProjectId && !myDayFilter && !thisWeekFilter && !overdueFilter);
-  document.getElementById('allTasksCount').textContent = tasks.filter(t=>t.status!=='done').length;
+  document.getElementById('allTasksCount').textContent = tasks.filter(t=>t.status!=='done' && !allTasksHiddenProjectIds.includes(t.projectId)).length;
 
   setNavActive('myDayNav', myDayFilter);
   document.getElementById('myDayCount').textContent = tasks.filter(t=>t.dueDate===todayStr() && t.status!=='done').length;
@@ -1352,6 +1380,10 @@ const sortComparators = {
 function taskMatchesFilters(t, opts){
   opts = opts || {};
   if(!opts.ignoreProject && filterProjectId && t.projectId!==filterProjectId) return false;
+  // Only in the true "All Tasks" state (no project filter, no smart view) —
+  // board view passes ignoreProject:true and always shows every project as
+  // its own column regardless of this setting.
+  if(!opts.ignoreProject && !filterProjectId && !myDayFilter && !thisWeekFilter && !overdueFilter && allTasksHiddenProjectIds.includes(t.projectId)) return false;
   if(myDayFilter && t.dueDate!==todayStr()) return false;
   if(thisWeekFilter && !isThisWeek(t.dueDate)) return false;
   if(overdueFilter && !isOverdue(t)) return false;
@@ -3112,6 +3144,22 @@ function applyImport(mode){
   save(); render();
 }
 
+function openAllTasksProjectsModal(){ renderAllTasksProjectsModal(); document.getElementById('allTasksProjectsModalBg').classList.add('open'); }
+function renderAllTasksProjectsModal(){
+  const el = document.getElementById('allTasksProjectsList');
+  el.innerHTML = visibleProjects().map(p=>{
+    const checked = !allTasksHiddenProjectIds.includes(p.id);
+    return `<div class="proj-select-row" role="checkbox" aria-checked="${checked}" tabindex="0" onclick="toggleAllTasksProject('${p.id}')">
+      <div class="proj-select-check ${checked?'checked':''}"><i class="fa-solid fa-check"></i></div>
+      <i class="fa-solid fa-${p.icon||'folder'} picon"></i>
+      <span>${esc(p.name)}</span>
+    </div>`;
+  }).join('');
+}
+function toggleAllTasksProject(id){
+  allTasksHiddenProjectIds = allTasksHiddenProjectIds.includes(id) ? allTasksHiddenProjectIds.filter(x=>x!==id) : [...allTasksHiddenProjectIds, id];
+  save(); render(); renderAllTasksProjectsModal();
+}
 function openBackupsModal(){ renderBackupsModal(); document.getElementById('backupsModalBg').classList.add('open'); }
 function renderBackupsModal(){
   const backups = getBackups();
@@ -3237,7 +3285,7 @@ async function createNewLinkedFile(){
     });
     fileHandle = handle;
     try{ await _fsPut(handle); }catch(_){}
-    await fileSyncWrite({projects, tasks, deletedTaskIds, deletedProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode});
+    await fileSyncWrite({projects, tasks, deletedTaskIds, deletedProjectIds, allTasksHiddenProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not create file', true); }
@@ -3269,7 +3317,7 @@ async function linkFile(){
       }
       return;
     }
-    await fileSyncWrite({projects, tasks, deletedTaskIds, deletedProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode});
+    await fileSyncWrite({projects, tasks, deletedTaskIds, deletedProjectIds, allTasksHiddenProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not link file', true); }
@@ -3294,6 +3342,7 @@ async function reconnectFile(){
       if(data.myDayFilter!==undefined) myDayFilter = data.myDayFilter;
       if(data.thisWeekFilter!==undefined) thisWeekFilter = data.thisWeekFilter;
       if(data.overdueFilter!==undefined) overdueFilter = data.overdueFilter;
+      if(data.allTasksHiddenProjectIds!==undefined) allTasksHiddenProjectIds = data.allTasksHiddenProjectIds;
       normalizeData();
       lastSyncedSnapshot = text;
       purgeOldCompletedTasks();

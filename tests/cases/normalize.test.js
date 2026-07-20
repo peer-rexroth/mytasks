@@ -7,6 +7,12 @@ test('project missing icon defaults to folder', function () {
   assertEqual(projById('p1').icon, 'folder');
 });
 
+test('normalizeData drops an allTasksHiddenProjectIds entry for a project that no longer exists', function () {
+  allTasksHiddenProjectIds = ['proj-work', 'does-not-exist'];
+  normalizeData();
+  assertDeepEqual(allTasksHiddenProjectIds, ['proj-work']);
+});
+
 test('missing proj-inbox is recreated at the front, locked', function () {
   projects = [{ id: 'p1', name: 'Only', icon: 'folder' }];
   tasks = [];

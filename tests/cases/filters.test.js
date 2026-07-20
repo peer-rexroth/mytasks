@@ -34,6 +34,50 @@ test('ignoreStatus lets a task through regardless of the status filter', functio
   assertTrue(taskMatchesFilters(t, { ignoreStatus: true }));
 });
 
+test('allTasksHiddenProjectIds hides a project\'s tasks from the true All Tasks state', function () {
+  tasks = [filterFixtureTask()]; // projectId: proj-personal
+  allTasksHiddenProjectIds = ['proj-personal'];
+  assertFalse(taskMatchesFilters(tasks[0]), 'a task in a hidden project should not match in All Tasks');
+});
+
+test('allTasksHiddenProjectIds is ignored once a project filter is active', function () {
+  tasks = [filterFixtureTask()];
+  allTasksHiddenProjectIds = ['proj-personal'];
+  filterProjectId = 'proj-personal';
+  assertTrue(taskMatchesFilters(tasks[0]), 'explicitly filtering to a project should still show its tasks even if it is hidden from All Tasks');
+});
+
+test('allTasksHiddenProjectIds is ignored in My Day/This Week/Overdue smart views', function () {
+  tasks = [{ ...filterFixtureTask(), dueDate: todayStr() }];
+  allTasksHiddenProjectIds = ['proj-personal'];
+  myDayFilter = true;
+  assertTrue(taskMatchesFilters(tasks[0]), 'smart views should not be affected by the All Tasks project selection');
+});
+
+test('allTasksHiddenProjectIds is ignored by board view (ignoreProject)', function () {
+  tasks = [filterFixtureTask()];
+  allTasksHiddenProjectIds = ['proj-personal'];
+  assertTrue(taskMatchesFilters(tasks[0], { ignoreProject: true }), 'board view shows every project as its own column regardless of the All Tasks selection');
+});
+
+test('toggleAllTasksProject adds and removes a project from the hidden list', function () {
+  toggleAllTasksProject('proj-work');
+  assertDeepEqual(allTasksHiddenProjectIds, ['proj-work']);
+  toggleAllTasksProject('proj-work');
+  assertDeepEqual(allTasksHiddenProjectIds, []);
+});
+
+test('renderAllTasksProjectsModal reflects the current hidden set', function () {
+  allTasksHiddenProjectIds = ['proj-work'];
+  renderAllTasksProjectsModal();
+  const html = document.getElementById('allTasksProjectsList').innerHTML;
+  const rows = html.split('proj-select-row').slice(1); // one chunk per project row
+  const workRow = rows.find(r => r.includes("toggleAllTasksProject('proj-work')"));
+  const personalRow = rows.find(r => r.includes("toggleAllTasksProject('proj-personal')"));
+  assertNotIncludes(workRow, 'proj-select-check checked', 'the hidden project\'s row should render unchecked');
+  assertIncludes(personalRow, 'proj-select-check checked', 'a project not in the hidden list should render checked');
+});
+
 test('search query matches title, notes, subtask text, and tag labels', function () {
   tasks = [
     { id: 't1', title: 'Nothing relevant', notes: '', projectId: 'proj-inbox', status: 'todo', priority: 'medium', subtasks: [], tags: [] },
