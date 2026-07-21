@@ -261,6 +261,26 @@ deletion recorded on one device/file propagates to whichever side is doing
 the reading — this is what lets tombstones do their job bidirectionally
 instead of only protecting the device that performed the delete.
 
+**The one exception: `applyImport()`'s merge mode.** `mergeData()` takes an
+`opts.respectTombstones` flag (default `true`); `applyImport('merge')` is the
+only caller that passes `{ respectTombstones: false }`. Picking a specific
+file and clicking Import → Merge is a deliberate, one-off action — the user
+is looking at that exact file and choosing to bring it in — unlike
+`linkFile()`/`reconnectFile()`/`initFileSync()`/`fileSyncWrite()`, which merge
+automatically in the background and where silently resurrecting a deletion
+via a stale copy would be surprising. With the flag off, a matching
+tombstone is cleared and the incoming item is added regardless of its
+`updatedAt` relative to the tombstone's `deletedAt` — this is also the one
+path that lets a *project* come back after deletion, since projects have no
+`updatedAt` to compare against. Without this, manually re-importing an old
+export/backup that contains anything you'd since deleted here would
+silently report "0 added, 0 updated" with no indication why — which is
+exactly the bug this was added to fix.
+
+Tombstones travel through the linked-file sync payload but **not** through
+the plain export/import `.json` format or the local daily-backup snapshots —
+same reasoning as the equivalent note in PromptLab's CLAUDE.md.
+
 ## Color scheme system
 
 Two independent axes control appearance: `data-theme` (`light`/`dark`,

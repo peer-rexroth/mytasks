@@ -79,6 +79,39 @@ test('mergeData merges incoming tombstones so a deletion recorded elsewhere prop
   assertTrue(deletedTaskIds.some(x => x.id === 't1'), 'the incoming tombstone should be adopted locally');
 });
 
+// { respectTombstones: false } — the opt-out applyImport('merge') uses (but
+// linkFile()/reconnectFile()/initFileSync()/fileSyncWrite() do not), since a
+// manual import is a deliberate, user-picked action rather than an automatic
+// background sync.
+test('mergeData with respectTombstones:false brings back a task even if the incoming copy is older than the tombstone', function () {
+  tasks = [];
+  deletedTaskIds = [{ id: 't1', deletedAt: 2000 }];
+  const { added } = mergeData({ tasks: [{ id: 't1', title: 'Deleted then reimported', projectId: 'proj-inbox', updatedAt: 1000 }] }, { respectTombstones: false });
+  assertEqual(added, 1);
+  assertTrue(tasks.some(t => t.id === 't1'));
+  assertFalse(deletedTaskIds.some(x => x.id === 't1'), 'the tombstone should be cleared once the task is deliberately brought back');
+});
+
+test('mergeData with respectTombstones:false brings back a tombstoned project', function () {
+  projects = [];
+  deletedProjectIds = [{ id: 'proj-work', deletedAt: Date.now() }];
+  mergeData({ projects: [{ id: 'proj-work', name: 'Work', icon: 'briefcase' }] }, { respectTombstones: false });
+  assertTrue(projects.some(p => p.id === 'proj-work'));
+  assertFalse(deletedProjectIds.some(x => x.id === 'proj-work'));
+});
+
+test('applyImport merge mode brings back a task previously deleted in this browser', function () {
+  tasks = [{ id: 't1', title: 'Old friend', projectId: 'proj-inbox', status: 'todo', priority: 'medium', updatedAt: 1000, subtasks: [], tags: [] }];
+  deleteTask('t1'); // tombstoned with deletedAt = now, well after updatedAt: 1000
+  modalTarget.action();
+  pendingImportData = {
+    projects: defaultProjects(),
+    tasks: [{ id: 't1', title: 'Old friend', projectId: 'proj-inbox', updatedAt: 1000, subtasks: [] }]
+  };
+  applyImport('merge');
+  assertTrue(tasks.some(t => t.id === 't1'), 'a manually-imported task should come back even though it was deleted here before');
+});
+
 test('reconnectFile() does not resurrect a task that was deleted locally, even if the linked file still has it', async function () {
   tasks = [];
   deletedTaskIds = [{ id: 't1', deletedAt: Date.now() }];

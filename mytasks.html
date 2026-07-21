@@ -3098,14 +3098,20 @@ function handleFileImport(event){
   event.target.value = '';
 }
 // Additive merge used by every "read data from outside localStorage" path
-// (linkFile, reconnectFile, initFileSync, fileSyncWrite's cross-tab merge).
-// Tombstones (deletedTaskIds/deletedProjectIds) are what let this tell "never
-// seen this id" apart from "saw it, user deleted it" — without them, an id
-// that's merely absent from the local array looks new either way, so a stale
-// copy from an old linked file or another device gets silently re-added.
-// Incoming tombstones are merged in the same pass so a deletion recorded on
-// one device/file propagates to whichever side is doing the reading.
-function mergeData(data){
+// (linkFile, reconnectFile, initFileSync, fileSyncWrite's cross-tab merge,
+// and applyImport's merge mode). Tombstones (deletedTaskIds/deletedProjectIds)
+// are what let this tell "never seen this id" apart from "saw it, user
+// deleted it" — without them, an id that's merely absent from the local
+// array looks new either way, so a stale copy from an old linked file or
+// another device gets silently re-added. Incoming tombstones are merged in
+// the same pass so a deletion recorded on one device/file propagates to
+// whichever side is doing the reading.
+//
+// opts.respectTombstones (default true) is set to false only by
+// applyImport()'s merge mode — see the comment on that call for why manual
+// import is exempt.
+function mergeData(data, opts){
+  const respectTombstones = !opts || opts.respectTombstones !== false;
   let added=0, updated=0;
   (data.deletedProjectIds||[]).forEach(dp=>{
     const existing = deletedProjectIds.find(x=>x.id===dp.id);
@@ -3119,7 +3125,8 @@ function mergeData(data){
   });
   (data.projects||[]).forEach(ip=>{
     if(projects.find(p=>p.id===ip.id || p.name.toLowerCase()===ip.name.toLowerCase())) return;
-    if(deletedProjectIds.some(x=>x.id===ip.id)) return;
+    if(respectTombstones && deletedProjectIds.some(x=>x.id===ip.id)) return;
+    if(!respectTombstones) untombstone(deletedProjectIds, ip.id);
     projects.push(ip);
   });
   (data.tasks||[]).forEach(it=>{
@@ -3129,8 +3136,8 @@ function mergeData(data){
       return;
     }
     const tomb = deletedTaskIds.find(x=>x.id===it.id);
-    if(tomb && tomb.deletedAt >= (it.updatedAt||0)) return; // stays deleted — the incoming copy is stale
-    if(tomb) untombstone(deletedTaskIds, it.id); // incoming edit is newer than our deletion — let it back in
+    if(respectTombstones && tomb && tomb.deletedAt >= (it.updatedAt||0)) return; // stays deleted — the incoming copy is stale
+    if(tomb) untombstone(deletedTaskIds, it.id); // incoming edit is newer than our deletion (or tombstones are being ignored) — let it back in
     tasks.push(it); added++;
   });
   return {added, updated};
@@ -3144,7 +3151,11 @@ function applyImport(mode){
     normalizeData();
     showToast('Backed up previous data, then replaced');
   } else {
-    const {added, updated} = mergeData(pendingImportData);
+    // A manual import is a deliberate, user-picked action — unlike an
+    // automatic file-sync merge, it should bring back a task/project
+    // previously deleted here rather than silently honoring that old
+    // tombstone (see mergeData()'s opts.respectTombstones).
+    const {added, updated} = mergeData(pendingImportData, { respectTombstones: false });
     normalizeData();
     showToast(`Merged — ${added} added, ${updated} updated`);
   }
