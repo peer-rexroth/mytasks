@@ -14,8 +14,21 @@ test('quickAddTask ignores non-Enter keys', function () {
   const before = tasks.length;
   const input = document.getElementById('quickAddInput');
   input.value = 'Should not be added';
-  quickAddTask({ key: 'Tab', target: input });
+  quickAddTask({ key: 'a', target: input });
   assertEqual(tasks.length, before);
+});
+
+// Tab is a no-op here rather than falling through to the browser's default
+// focus-to-next-tabbable-element behavior — this is a single-purpose field
+// with no adjacent field to tab into, so leaving it should require a click
+// or Escape, not an incidental Tab press.
+test('quickAddTask swallows Tab, preventing default so focus stays put', function () {
+  const input = document.getElementById('quickAddInput');
+  input.value = 'Still typing';
+  let prevented = false;
+  quickAddTask({ key: 'Tab', target: input, preventDefault(){ prevented = true; } });
+  assertTrue(prevented, 'Tab should be preventDefault-ed instead of left to the browser');
+  assertEqual(input.value, 'Still typing', 'the draft text should be untouched');
 });
 
 test('quickAddTask ignores blank input', function () {

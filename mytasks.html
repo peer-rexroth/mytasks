@@ -1997,6 +1997,11 @@ function renderDrawer(){
 
 // ── Task CRUD ─────────────────────────────────────────────────────────────────
 function quickAddTask(event){
+  // Tab is a no-op here: this is a single-purpose field with no adjacent
+  // field to tab into, so pressing Tab (unlike Enter) shouldn't hand focus
+  // off to whatever happens to be next in DOM order (the collapse-all
+  // button, then into the task rows) — it should just stay put.
+  if(event.key==='Tab'){ event.preventDefault(); return; }
   if(event.key!=='Enter') return;
   const input = event.target;
   const title = input.value.trim();
