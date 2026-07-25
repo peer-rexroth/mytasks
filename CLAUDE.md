@@ -62,16 +62,36 @@ Task {
   subtasks: [Subtask]
 }
 
-Subtask { id, text, done, subtasks: [Step] }   // one level of children
-Step    { id, text, done }                      // leaf — no further nesting
+Subtask  { id, text, done, subtasks: [Step] }     // one level of children
+Step     { id, text, done, subtasks: [SubStep] }  // one level of children
+SubStep  { id, text, done }                        // leaf — no further nesting
 
 Tag { id, label, color }  // color is one of CAT_COLORS' names (see below)
 ```
 
-Nesting is exactly **3 levels**: task → subtask → step. Steps cannot have
-their own children. `promoteStepToSubtask()`/`demoteSubtaskToStep()` and the
-drag-and-drop system convert between the two levels; demoting a subtask that
-already has its own steps is blocked (would need a 4th level) with a toast.
+Nesting is exactly **4 levels**: task → subtask → step → sub-step. Sub-steps
+are the leaf and cannot have their own children. Internally the code names
+each level one "Sub" deeper than the last regardless of its UI label —
+Subtask is called `subtask` in code (matches its UI name), Step is called
+`SubSubtask` internally (`ss`, `subSubId`) even though the UI says "Step",
+and Sub-step continues that same pattern as `SubSubSubtask` (`sss`,
+`subSubSubId`) even though the UI says "Sub-step". This is a deliberate,
+discussed tradeoff — verbose, but consistent with how the Step tier was
+already named rather than introducing a cleaner scheme for one more level.
+
+`promoteStepToSubtask()`/`demoteSubtaskToStep()` (Subtask↔Step boundary) and
+`promoteSubSubtaskToStep()`/`demoteStepToSubSubtask()` (Step↔Sub-step
+boundary) convert between adjacent levels. A promoted item's own `subtasks`
+array always travels with it unmodified — nothing needs "transformation"
+when moving between levels, since the field is generically named `subtasks`
+at every level and a level's meaning is just "however deep its parent chain
+currently is" (a Step's children are simply reinterpreted as Sub-steps once
+it becomes a Subtask via promotion, and vice versa via demotion). Only the
+deepest demote (`demoteStepToSubSubtask()`) can still be blocked with a
+toast ("this step has its own sub-steps — remove or promote them first"),
+since there's no 5th level to receive a Sub-step's children — demoting a
+Subtask-with-Steps is legal (its Steps become the newly-demoted Step's
+Sub-steps), unlike before Sub-steps existed.
 
 `CAT_COLORS` is now a small palette (`blue`, `teal`, `purple`) used only for
 tag colors — it used to also drive project colors before projects switched to
@@ -116,22 +136,28 @@ not-done task needs triage and `proj-deleted` is done-only by convention.
 
 ## Views and where features live
 
-There are three surfaces that can show a task's subtasks/steps, and they are
-**deliberately not at feature parity**:
+There are three surfaces that can show a task's subtasks/steps/sub-steps,
+and they are **deliberately not at feature parity**:
 
 - **List view** (`renderList`, `#taskList`) — the primary surface. Full CRUD
-  for subtasks and steps: add (inline input, Tab/Shift+Tab to
-  indent/outdent between subtask-add and step-add), rename (dblclick),
-  delete, drag-reorder within and **across** parents, promote/demote,
-  collapse/expand (chevron, hover-revealed hierarchy buttons).
+  for subtasks, steps, and sub-steps: add (inline input, Tab/Shift+Tab to
+  indent/outdent — a 3-hop chain: subtask-add → step-add → sub-step-add),
+  rename (dblclick), delete, promote/demote, collapse/expand (chevron,
+  hover-revealed hierarchy buttons). Drag-reorder works **across** parents
+  for subtasks/steps (`draggedItem`/`handleHierarchyDrop*`), but sub-steps
+  only drag-reorder **within their own parent step** (`draggedSubstep`/
+  `handleSubstepDrag*`, a deliberately separate, much simpler system — see
+  "Shared state that spans views" below).
 - **Drawer** (`renderDrawer`, the task detail slide-out) — same full CRUD as
   list view, plus this is the only place with a permanent (not hover-only)
   UI for it, since it's a dedicated single-task editor.
 - **Board view** (`boardCardHtml`, `renderBoard`) — intentionally lighter.
   Subtasks support toggle/rename/add (mirroring list view), but steps are
   strictly read + toggle-done only — no rename/delete/drag for steps on a
-  card. There is also **no drag-and-drop** for subtasks/steps within a
-  card. Reason: `.board-card` is itself
+  card. **Sub-steps don't render on a board card at all** — `boardCardHtml()`
+  never descends into a step's `subtasks` array, the same reduced-parity
+  reasoning extended one level further. There is also **no drag-and-drop**
+  for subtasks/steps within a card. Reason: `.board-card` is itself
   `draggable="true"` for column-to-column moves; nesting another
   `draggable="true"` row inside it is unreliable across browsers. Card
   height is also a real constraint (kanban columns want roughly uniform
@@ -148,8 +174,9 @@ There are three surfaces that can show a task's subtasks/steps, and they are
   `{ignoreProject:true}`; list view passes no opts (both filters fully
   apply there).
 
-When adding a subtask/step feature, decide deliberately whether it belongs in
-all three surfaces or just list view + drawer — don't assume parity.
+When adding a subtask/step/sub-step feature, decide deliberately whether it
+belongs in all three surfaces or just list view + drawer — don't assume
+parity.
 
 ## Shared state that spans views
 
@@ -157,25 +184,51 @@ A handful of module-level variables are intentionally shared across list,
 board, and drawer renders, so toggling something in one view is reflected in
 the others:
 
-- `collapsedTaskIds` / `collapsedSubIds` — Sets of task/subtask ids whose
-  children are collapsed. Read by both `renderList()` and `boardCardHtml()`.
+- `collapsedTaskIds` / `collapsedSubIds` / `collapsedSubSubIds` — Sets of
+  task/subtask/step ids whose children are collapsed. `collapsedTaskIds` and
+  `collapsedSubIds` are read by both `renderList()` and `boardCardHtml()`;
+  `collapsedSubSubIds` (step-level collapse, new once steps could have
+  sub-steps) is list-view/drawer-only since board never renders sub-steps.
   Any function that mutates these must call the general `render()`, not
   `renderList()` or `renderBoard()` specifically — this exact mistake (calling
   the wrong one) has caused several real "the button does nothing" bugs.
-- `inlineAddSubtaskTaskId` / `inlineAddParentSubId` — which task/subtask
-  currently has an open "add" input, and drives both which input renders and
-  whether a container force-expands regardless of collapse state. Collapsing
-  a task/subtask clears these if they pointed at it, to avoid a stale "still
-  adding" flag holding a container open after the user tries to collapse it.
+  `toggleTaskCollapseDeep()` cycles a task through all 4 stages (task
+  collapsed → subtasks visible → steps visible → sub-steps visible →
+  collapse back down), touching all three Sets in turn.
+- `inlineAddSubtaskTaskId` / `inlineAddParentSubId` / `inlineAddParentStepId`
+  — which task/subtask/step currently has an open "add" input, and drives
+  both which input renders and whether a container force-expands regardless
+  of collapse state. `inlineAddParentStepId` is the 3rd hop in the Tab-chain
+  (subtask-add → step-add → sub-step-add), added alongside sub-steps.
+  Collapsing a task/subtask/step clears these if they pointed at it, to
+  avoid a stale "still adding" flag holding a container open after the user
+  tries to collapse it — every place that clears `inlineAddParentSubId`
+  clears `inlineAddParentStepId` too, even sites that can't currently reach
+  a non-null value for it (e.g. board's key-nav), for defense in depth.
 - `draggedItem` — `{type: 'subtask'|'step', subId, stepId?}`, one unified
   drag state for both subtask- and step-level drag-and-drop (list view +
   drawer only, not board — see above). Drop-target semantics: dropping on a
   **subtask row** reorders at top level (or, if dragging a step, moves it
   into that subtask as a step); dropping on a **step row** inserts into that
-  step's parent subtask (promoting/demoting as needed).
-- `drawerExpandedSubIds` — drawer-only, independent from `collapsedSubIds`,
-  since the drawer's steps-panel-per-subtask UI has different default
-  expand/collapse behavior than list view's chevrons.
+  step's parent subtask (promoting/demoting as needed). Neither branch of
+  `handleHierarchyDrop()` ever strips the dragged object's own `subtasks` —
+  a promoted/demoted/reordered item's children always travel with it
+  unmodified (only defaulted to `[]` when entirely missing), which matters
+  now that a dragged Step can have its own Sub-steps.
+- `draggedSubstep` — `{taskId, subId, stepId, substepId}`, a deliberately
+  **separate, much simpler** drag system for sub-steps, reusing none of
+  `draggedItem`'s code paths. Sub-steps only drag-reorder within their own
+  parent step — `handleSubstepDragOver`/`handleSubstepDrop` both early-return
+  if the dragged sub-step's `stepId` doesn't match the target row's step,
+  which is the sole enforcement point for "same parent only." Moving a
+  sub-step to become a step (or a step down to a sub-step) only happens via
+  the promote/demote buttons, never drag-and-drop — extending the full
+  cross-parent `draggedItem` system to a 3rd type was deliberately avoided
+  as too large/risky a change for what sub-step drag support needed to be.
+- `drawerExpandedSubIds` / `drawerExpandedStepIds` — drawer-only, independent
+  from `collapsedSubIds`/`collapsedSubSubIds`, since the drawer's
+  steps-panel-per-subtask (and sub-steps-panel-per-step) UI has different
+  default expand/collapse behavior than list view's chevrons.
 
 Board view specifically does **not** honor `collapsedTaskIds` for hiding a
 card's entire subtask list unless it also has its own way to un-collapse it
@@ -203,7 +256,7 @@ sync mechanism), route it through `normalizeData()` too.
 `normalizeData()` is also the security boundary for the same reason: every
 id in the app is interpolated unescaped into `onclick`/`data-id` HTML
 attributes at render time (`esc()` only covers *content* fields — title,
-notes, subtask/step text, project name — never `id`). That's fine for
+notes, subtask/step/sub-step text, project name — never `id`). That's fine for
 locally-created data since `genId()` only ever produces plain alphanumeric
 strings, but `mergeData()` and `applyImport('replace')` push `id`/`icon`
 values from an external `.json` file in as-is. `isSafeId()` plus the

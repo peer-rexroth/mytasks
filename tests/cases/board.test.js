@@ -64,3 +64,16 @@ test('handleBoardDrop is a no-op when nothing is being dragged', function () {
   handleBoardDrop(fakeEvent, 'proj-personal');
   assertEqual(JSON.stringify(tasks), before);
 });
+
+// Regression guard: board cards deliberately stop at Step (read + toggle-done
+// only, see CLAUDE.md) — a step's own sub-steps should never leak into the
+// board card, even though they now exist in the data model.
+test('boardCardHtml never renders a step\'s own sub-steps', function () {
+  const t = {
+    id: 't1', title: 'Task', projectId: 'proj-inbox', status: 'todo', priority: 'medium', tags: [],
+    subtasks: [{ id: 's1', text: 'Sub', done: false, subtasks: [{ id: 'st1', text: 'Step', done: false, subtasks: [{ id: 'sst1', text: 'Hidden sub-step', done: false }] }] }]
+  };
+  const html = boardCardHtml(t);
+  assertIncludes(html, 'Step');
+  assertNotIncludes(html, 'Hidden sub-step');
+});

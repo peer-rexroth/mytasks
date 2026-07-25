@@ -1000,16 +1000,21 @@ let kbdSelectedTaskId = null;
 let renamingTaskId = null;
 let renamingSubtask = null; // {taskId, subId}
 let renamingSubSubtask = null; // {taskId, subId, subSubId}
+let renamingSubSubSubtask = null; // {taskId, subId, stepId, subSubSubId}
 let selectedTaskIds = new Set();
 let lastClickedTaskId = null;
 let inlineAddSubtaskTaskId = null;
 let inlineAddParentSubId = null;
+let inlineAddParentStepId = null;
 let justCompletedTaskId = null;
 let justCompletedSubId = null;
 let justCompletedSubSubId = null;
+let justCompletedSubSubSubId = null;
 let collapsedTaskIds = new Set();
 let collapsedSubIds = new Set();
+let collapsedSubSubIds = new Set();
 let drawerExpandedSubIds = new Set();
+let drawerExpandedStepIds = new Set();
 let showAllCompletedList = false;
 let expandedCompletedProjects = new Set();
 let draggedItem = null;
@@ -1068,7 +1073,11 @@ function normalizeData(){
     t.subtasks.forEach(s=>{
       if(!isSafeId(s.id)) s.id=genId();
       if(!Array.isArray(s.subtasks)) s.subtasks=[];
-      s.subtasks.forEach(ss=>{ if(!isSafeId(ss.id)) ss.id=genId(); });
+      s.subtasks.forEach(ss=>{
+        if(!isSafeId(ss.id)) ss.id=genId();
+        if(!Array.isArray(ss.subtasks)) ss.subtasks=[];
+        ss.subtasks.forEach(sss=>{ if(!isSafeId(sss.id)) sss.id=genId(); });
+      });
     });
     if(!Array.isArray(t.tags)) t.tags=[];
     t.tags = t.tags.filter(id=>TAGS.some(tg=>tg.id===id));
@@ -1395,7 +1404,7 @@ function taskMatchesFilters(t, opts){
   }
   if(searchQuery){
     const q = searchQuery.toLowerCase();
-    const subtaskText = (t.subtasks||[]).map(s=>s.text+' '+(s.subtasks||[]).map(ss=>ss.text).join(' ')).join(' ');
+    const subtaskText = (t.subtasks||[]).map(s=>s.text+' '+(s.subtasks||[]).map(ss=>ss.text+' '+(ss.subtasks||[]).map(sss=>sss.text).join(' ')).join(' ')).join(' ');
     const tagText = (t.tags||[]).map(id=>(tagById(id)||{}).label||'').join(' ');
     const hay = (t.title+' '+(t.notes||'')+' '+subtaskText+' '+tagText).toLowerCase();
     if(!hay.includes(q)) return false;
@@ -1479,15 +1488,31 @@ function renderList(){
           <div class="task-subtask-row ${ss.done?'done':''}" draggable="true"
             ondragstart="handleHierarchyDragStart(event,'step','${s.id}','${ss.id}')" ondragend="handleHierarchyDragEnd(event)"
             ondragover="handleHierarchyDragOver(event,'step','${s.id}','${ss.id}')" ondragleave="handleHierarchyDragLeave(event)" ondrop="handleHierarchyDrop(event,'${t.id}','step','${s.id}','${ss.id}')">
+            ${(ss.subtasks||[]).length>0?`<button class="icon-btn subtask-toggle" onclick="event.stopPropagation();toggleSubSubCollapse('${ss.id}');this.blur()" title="${collapsedSubSubIds.has(ss.id)?'Expand':'Collapse'} sub-steps"><i class="fa-solid fa-chevron-${collapsedSubSubIds.has(ss.id)?'right':'down'}"></i></button>`:''}
             <div class="mini-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
             ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
               ? `<input spellcheck="true" type="text" class="task-subtask-text-input" id="renameSubSubtaskInputList" value="${esc(ss.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); } else if(event.key==='Tab'){ event.preventDefault(); this.blur(); }">`
               : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubSubtask('${t.id}','${s.id}','${ss.id}','list')">${highlightMatch(ss.text, searchQuery)}</span>`}
+            <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();demoteStepToSubSubtask('${t.id}','${s.id}','${ss.id}')" title="Make this a sub-step of the step above"><i class="fa-solid fa-indent"></i></button>
             <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();promoteStepToSubtask('${t.id}','${s.id}','${ss.id}')" title="Make this its own subtask"><i class="fa-solid fa-outdent"></i></button>
             <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();deleteSubSubtask('${t.id}','${s.id}','${ss.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
           </div>
-        `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
-          <input spellcheck="true" type="text" id="inlineSubtaskInput" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentInlineSubtaskInput('${t.id}');}">
+          ${(((ss.subtasks||[]).length>0 && !collapsedSubSubIds.has(ss.id))||(inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id && inlineAddParentStepId===ss.id))?`<div class="task-subtasks" style="margin-left:21px">${(ss.subtasks||[]).map(sss=>`
+            <div class="task-subtask-row ${sss.done?'done':''}" draggable="true"
+              ondragstart="handleSubstepDragStart(event,'${t.id}','${s.id}','${ss.id}','${sss.id}')" ondragend="handleSubstepDragEnd(event)"
+              ondragover="handleSubstepDragOver(event,'${ss.id}','${sss.id}')" ondragleave="handleSubstepDragLeave(event)" ondrop="handleSubstepDrop(event,'${t.id}','${s.id}','${ss.id}','${sss.id}')">
+              <div class="mini-check ${sss.done?'checked':''} ${sss.id===justCompletedSubSubSubId?'pop':''}" role="checkbox" aria-checked="${sss.done}" aria-label="Mark sub-step done" tabindex="0" onclick="event.stopPropagation();toggleSubSubSubtask('${t.id}','${s.id}','${ss.id}','${sss.id}')"><i class="fa-solid fa-check"></i></div>
+              ${renamingSubSubSubtask && renamingSubSubSubtask.taskId===t.id && renamingSubSubSubtask.subId===s.id && renamingSubSubSubtask.stepId===ss.id && renamingSubSubSubtask.subSubSubId===sss.id
+                ? `<input spellcheck="true" type="text" class="task-subtask-text-input" id="renameSubSubSubtaskInputList" value="${esc(sss.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubSubSubtask('${t.id}','${s.id}','${ss.id}','${sss.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubSubtask(); } else if(event.key==='Tab'){ event.preventDefault(); this.blur(); }">`
+                : `<span onclick="event.stopPropagation()" ondblclick="event.stopPropagation();startRenameSubSubSubtask('${t.id}','${s.id}','${ss.id}','${sss.id}','list')">${highlightMatch(sss.text, searchQuery)}</span>`}
+              <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();promoteSubSubtaskToStep('${t.id}','${s.id}','${ss.id}','${sss.id}')" title="Make this its own step"><i class="fa-solid fa-outdent"></i></button>
+              <button class="icon-btn sub-hierarchy-btn" onclick="event.stopPropagation();deleteSubSubSubtask('${t.id}','${s.id}','${ss.id}','${sss.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id && inlineAddParentStepId===ss.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
+            <input spellcheck="true" type="text" id="inlineSubtaskInput" placeholder="Add a sub-step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubSubtask('${t.id}','${s.id}','${ss.id}')} else if(event.key==='Tab'){event.preventDefault();outdentInlineSubSubtaskInput('${t.id}','${s.id}');}">
+          </div>`:''}</div>`:''}
+        `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id && !inlineAddParentStepId?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
+          <input spellcheck="true" type="text" id="inlineSubtaskInput" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentInlineSubSubtaskInput('${t.id}','${s.id}');} else {outdentInlineSubtaskInput('${t.id}');}}">
         </div>`:''}</div>`:''}
       `).join('')}${inlineAddSubtaskTaskId===t.id && !inlineAddParentSubId?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
         <input spellcheck="true" type="text" id="inlineSubtaskInput" placeholder="Add a subtask and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubtask('${t.id}')} else if(event.key==='Tab'){event.preventDefault(); if(!event.shiftKey){indentInlineSubtaskInput('${t.id}');}}">
@@ -1636,6 +1661,7 @@ function handleBoardKeyNav(e){
     if(colIdx===-1) return;
     inlineAddSubtaskTaskId = kbdSelectedTaskId;
     inlineAddParentSubId = null;
+    inlineAddParentStepId = null;
     renderBoard();
     document.getElementById('inlineSubtaskInputBoard')?.focus();
     return;
@@ -1663,6 +1689,7 @@ function handleBoardKeyNav(e){
   const hadInlineAdd = inlineAddSubtaskTaskId !== null;
   inlineAddSubtaskTaskId = null;
   inlineAddParentSubId = null;
+  inlineAddParentStepId = null;
   if(colIdx===-1){
     colIdx = columns.findIndex(c=>c.tasks.length>0);
     if(colIdx===-1) return;
@@ -1703,7 +1730,7 @@ function setViewMode(mode){
 }
 
 // ── Drawer ────────────────────────────────────────────────────────────────────
-function openTask(id){ activeTaskId = id; kbdSelectedTaskId = id; inlineAddSubtaskTaskId = null; inlineAddParentSubId = null; renderDrawer(); if(viewMode==='board'){ renderBoard(); } else { renderList(); } }
+function openTask(id){ activeTaskId = id; kbdSelectedTaskId = id; inlineAddSubtaskTaskId = null; inlineAddParentSubId = null; inlineAddParentStepId = null; renderDrawer(); if(viewMode==='board'){ renderBoard(); } else { renderList(); } }
 function closeDrawer(){ activeTaskId = null; renderDrawer(); }
 
 // ── Bulk selection ────────────────────────────────────────────────────────────
@@ -1961,7 +1988,11 @@ function renderDrawer(){
           </div>
           ${stepsOpen ? `
           <div class="task-subtasks" style="margin-left:24px">
-            ${(s.subtasks||[]).map(ss=>`
+            ${(s.subtasks||[]).map(ss=>{
+              const subStepsOpen = drawerExpandedStepIds.has(ss.id);
+              const subStepCount = (ss.subtasks||[]).length;
+              const subToggleIcon = subStepsOpen ? 'chevron-down' : (subStepCount>0 ? 'chevron-right' : 'plus');
+              return `
               <div class="subtask-row ${ss.done?'done':''}" draggable="true"
                 ondragstart="handleHierarchyDragStart(event,'step','${s.id}','${ss.id}')" ondragend="handleHierarchyDragEnd(event)"
                 ondragover="handleHierarchyDragOver(event,'step','${s.id}','${ss.id}')" ondragleave="handleHierarchyDragLeave(event)" ondrop="handleHierarchyDrop(event,'${t.id}','step','${s.id}','${ss.id}')">
@@ -1970,10 +2001,32 @@ function renderDrawer(){
                 ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
                   ? `<input spellcheck="true" type="text" class="sub-text-input" id="renameSubSubtaskInputDrawer" value="${esc(ss.text)}" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); } else if(event.key==='Tab'){ event.preventDefault(); this.blur(); }">`
                   : `<div class="sub-text" ondblclick="startRenameSubSubtask('${t.id}','${s.id}','${ss.id}','drawer')">${esc(ss.text)}</div>`}
+                <button class="icon-btn sub-step-toggle" onclick="toggleDrawerSubStepsPanel('${ss.id}');this.blur()" title="${subStepsOpen?'Hide':(subStepCount>0?'Show':'Add')} sub-steps"><i class="fa-solid fa-${subToggleIcon}"></i></button>
+                <button class="icon-btn" onclick="demoteStepToSubSubtask('${t.id}','${s.id}','${ss.id}')" title="Make this a sub-step of the step above"><i class="fa-solid fa-indent"></i></button>
                 <button class="icon-btn" onclick="promoteStepToSubtask('${t.id}','${s.id}','${ss.id}')" title="Make this its own subtask"><i class="fa-solid fa-outdent"></i></button>
                 <button class="icon-btn sub-del" onclick="deleteSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-trash"></i></button>
               </div>
-            `).join('')}
+              ${subStepsOpen ? `
+              <div class="task-subtasks" style="margin-left:24px">
+                ${(ss.subtasks||[]).map(sss=>`
+                  <div class="subtask-row ${sss.done?'done':''}" draggable="true"
+                    ondragstart="handleSubstepDragStart(event,'${t.id}','${s.id}','${ss.id}','${sss.id}')" ondragend="handleSubstepDragEnd(event)"
+                    ondragover="handleSubstepDragOver(event,'${ss.id}','${sss.id}')" ondragleave="handleSubstepDragLeave(event)" ondrop="handleSubstepDrop(event,'${t.id}','${s.id}','${ss.id}','${sss.id}')">
+                    <i class="fa-solid fa-grip-vertical sub-drag-handle"></i>
+                    <div class="sub-check ${sss.done?'checked':''} ${sss.id===justCompletedSubSubSubId?'pop':''}" role="checkbox" aria-checked="${sss.done}" aria-label="Mark sub-step done" tabindex="0" onclick="toggleSubSubSubtask('${t.id}','${s.id}','${ss.id}','${sss.id}')"><i class="fa-solid fa-check"></i></div>
+                    ${renamingSubSubSubtask && renamingSubSubSubtask.taskId===t.id && renamingSubSubSubtask.subId===s.id && renamingSubSubSubtask.stepId===ss.id && renamingSubSubSubtask.subSubSubId===sss.id
+                      ? `<input spellcheck="true" type="text" class="sub-text-input" id="renameSubSubSubtaskInputDrawer" value="${esc(sss.text)}" onblur="commitRenameSubSubSubtask('${t.id}','${s.id}','${ss.id}','${sss.id}', this.value)" onkeydown="if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubSubtask(); } else if(event.key==='Tab'){ event.preventDefault(); this.blur(); }">`
+                      : `<div class="sub-text" ondblclick="startRenameSubSubSubtask('${t.id}','${s.id}','${ss.id}','${sss.id}','drawer')">${esc(sss.text)}</div>`}
+                    <button class="icon-btn" onclick="promoteSubSubtaskToStep('${t.id}','${s.id}','${ss.id}','${sss.id}')" title="Make this its own step"><i class="fa-solid fa-outdent"></i></button>
+                    <button class="icon-btn sub-del" onclick="deleteSubSubSubtask('${t.id}','${s.id}','${ss.id}','${sss.id}')"><i class="fa-solid fa-trash"></i></button>
+                  </div>
+                `).join('')}
+                <div class="task-subtask-add-row">
+                  <input spellcheck="true" type="text" id="newSubSubSubtaskInput-${ss.id}" placeholder="Add a sub-step + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubSubSubtask('${t.id}','${s.id}','${ss.id}')} else if(event.key==='Tab'){event.preventDefault();outdentDrawerSubSubtaskInput('${t.id}','${s.id}','${ss.id}');}">
+                </div>
+              </div>
+              ` : ''}
+              `;}).join('')}
             <div class="task-subtask-add-row">
               <input spellcheck="true" type="text" id="newSubSubtaskInput-${s.id}" placeholder="Add a step + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentDrawerSubtaskInput('${t.id}','${s.id}');}">
             </div>
@@ -2022,10 +2075,11 @@ function quickAddTask(event){
 function advanceRecurring(id){
   const t = tasks.find(x=>x.id===id); if(!t) return null;
   const prevDueDate = t.dueDate;
-  // Deep-copy each subtask's own steps array too — a shallow {...s} spread
-  // would share the same steps array/objects with the live task, so
-  // resetting step .done below would silently corrupt this undo snapshot.
-  const prevSubtasks = (t.subtasks||[]).map(s=>({...s, subtasks:(s.subtasks||[]).map(ss=>({...ss}))}));
+  // Deep-copy each subtask's own steps, and each step's own sub-steps, too —
+  // a shallow {...s} spread would share the same nested arrays/objects with
+  // the live task, so resetting done state below would silently corrupt
+  // this undo snapshot.
+  const prevSubtasks = (t.subtasks||[]).map(s=>({...s, subtasks:(s.subtasks||[]).map(ss=>({...ss, subtasks:(ss.subtasks||[]).map(sss=>({...sss}))}))}));
   const prevRepeat = t.repeat;
   const prevOccCount = t.repeatOccurrenceCount || 0;
   const next = nextOccurrence(t.dueDate, t);
@@ -2036,7 +2090,7 @@ function advanceRecurring(id){
   } else {
     t.dueDate = next;
     t.repeatOccurrenceCount = newCount;
-    (t.subtasks||[]).forEach(s=>{ s.done=false; (s.subtasks||[]).forEach(ss=>{ ss.done=false; }); });
+    (t.subtasks||[]).forEach(s=>{ s.done=false; (s.subtasks||[]).forEach(ss=>{ ss.done=false; (ss.subtasks||[]).forEach(sss=>{ sss.done=false; }); }); });
   }
   t.updatedAt = Date.now();
   return {
@@ -2200,7 +2254,7 @@ function duplicateTask(id){
     repeatEndDate: t.repeatEndDate || null,
     repeatMaxOccurrences: t.repeatMaxOccurrences || null,
     repeatOccurrenceCount: 0,
-    subtasks: (t.subtasks||[]).map(s=>({id:genId(), text:s.text, done:false, subtasks:(s.subtasks||[]).map(ss=>({id:genId(), text:ss.text, done:false}))})),
+    subtasks: (t.subtasks||[]).map(s=>({id:genId(), text:s.text, done:false, subtasks:(s.subtasks||[]).map(ss=>({id:genId(), text:ss.text, done:false, subtasks:(ss.subtasks||[]).map(sss=>({id:genId(), text:sss.text, done:false}))}))})),
     createdAt: Date.now(), updatedAt: Date.now()
   };
   const idx = tasks.findIndex(x=>x.id===id);
@@ -2366,6 +2420,77 @@ function deleteSubSubtask(taskId, subId, subSubId){
     save(); render();
   });
 }
+function startRenameSubSubSubtask(taskId, subId, stepId, subSubSubId, context){
+  renamingSubSubSubtask = { taskId, subId, stepId, subSubSubId };
+  if(context==='list'){
+    renderList();
+    const input = document.getElementById('renameSubSubSubtaskInputList');
+    if(input){ input.focus(); input.select(); }
+  } else {
+    renderDrawer();
+    const input = document.getElementById('renameSubSubSubtaskInputDrawer');
+    if(input){ input.focus(); input.select(); }
+  }
+}
+function commitRenameSubSubSubtask(taskId, subId, stepId, subSubSubId, value){
+  if(!renamingSubSubSubtask || renamingSubSubSubtask.taskId!==taskId || renamingSubSubSubtask.subId!==subId || renamingSubSubSubtask.stepId!==stepId || renamingSubSubSubtask.subSubSubId!==subSubSubId) return;
+  renamingSubSubSubtask = null;
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const ss = (s.subtasks||[]).find(x=>x.id===stepId); if(!ss) return;
+  const sss = (ss.subtasks||[]).find(x=>x.id===subSubSubId); if(!sss) return;
+  const text = value.trim();
+  if(text && text!==sss.text){ sss.text = text; t.updatedAt = Date.now(); save(); }
+  render();
+}
+function cancelRenameSubSubSubtask(){
+  renamingSubSubSubtask = null;
+  render();
+}
+function addSubSubSubtask(taskId, subId, stepId){
+  const input = document.getElementById(`newSubSubSubtaskInput-${stepId}`);
+  if(!input) return;
+  const text = input.value.trim(); if(!text) return;
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const ss = (s.subtasks||[]).find(x=>x.id===stepId); if(!ss) return;
+  if(!Array.isArray(ss.subtasks)) ss.subtasks=[];
+  ss.subtasks.push({id:genId(), text, done:false});
+  t.updatedAt = Date.now();
+  save(); render();
+  document.getElementById(`newSubSubSubtaskInput-${stepId}`)?.focus();
+}
+function toggleSubSubSubtask(taskId, subId, stepId, subSubSubId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const ss = (s.subtasks||[]).find(x=>x.id===stepId); if(!ss) return;
+  const sss = (ss.subtasks||[]).find(x=>x.id===subSubSubId); if(!sss) return;
+  sss.done = !sss.done;
+  t.updatedAt = Date.now();
+  if(sss.done) justCompletedSubSubSubId = subSubSubId;
+  save(); render();
+  justCompletedSubSubSubId = null;
+}
+function deleteSubSubSubtask(taskId, subId, stepId, subSubSubId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const ss = (s.subtasks||[]).find(x=>x.id===stepId); if(!ss) return;
+  const idx = (ss.subtasks||[]).findIndex(x=>x.id===subSubSubId);
+  if(idx===-1) return;
+  const [removed] = ss.subtasks.splice(idx,1);
+  t.updatedAt = Date.now();
+  if(renamingSubSubSubtask && renamingSubSubSubtask.taskId===taskId && renamingSubSubSubtask.subId===subId && renamingSubSubSubtask.stepId===stepId && renamingSubSubSubtask.subSubSubId===subSubSubId) renamingSubSubSubtask = null;
+  save(); render();
+  showToast('Sub-step deleted', false, ()=>{
+    const task = tasks.find(x=>x.id===taskId); if(!task) return;
+    const sub = (task.subtasks||[]).find(x=>x.id===subId); if(!sub) return;
+    const step = (sub.subtasks||[]).find(x=>x.id===stepId); if(!step) return;
+    if(!Array.isArray(step.subtasks)) step.subtasks=[];
+    step.subtasks.splice(idx,0,removed);
+    task.updatedAt = Date.now();
+    save(); render();
+  });
+}
 
 // ── Subtask/step collapsing ───────────────────────────────────────────────────
 function toggleTaskCollapse(taskId){
@@ -2373,28 +2498,36 @@ function toggleTaskCollapse(taskId){
     collapsedTaskIds.delete(taskId);
   } else {
     collapsedTaskIds.add(taskId);
-    if(inlineAddSubtaskTaskId===taskId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; }
+    if(inlineAddSubtaskTaskId===taskId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; inlineAddParentStepId=null; }
   }
   render();
 }
 function toggleTaskCollapseDeep(taskId){
   const t = tasks.find(x=>x.id===taskId); if(!t) return;
   const subtasksWithSteps = (t.subtasks||[]).filter(s=>(s.subtasks||[]).length>0);
+  const stepsWithSubSteps = subtasksWithSteps.flatMap(s=>s.subtasks).filter(ss=>(ss.subtasks||[]).length>0);
   const taskCollapsed = collapsedTaskIds.has(taskId);
   const stepsFullyExpanded = subtasksWithSteps.every(s=>!collapsedSubIds.has(s.id));
+  const subStepsFullyExpanded = stepsWithSubSteps.every(ss=>!collapsedSubSubIds.has(ss.id));
 
   if(taskCollapsed){
-    // collapsed -> subtasks visible, steps still collapsed
+    // collapsed -> subtasks visible, steps/sub-steps still collapsed
     collapsedTaskIds.delete(taskId);
     subtasksWithSteps.forEach(s=>collapsedSubIds.add(s.id));
+    stepsWithSubSteps.forEach(ss=>collapsedSubSubIds.add(ss.id));
   } else if(!stepsFullyExpanded){
-    // subtasks visible -> also expand their steps
+    // subtasks visible -> also expand their steps (sub-steps still collapsed)
     subtasksWithSteps.forEach(s=>collapsedSubIds.delete(s.id));
+    stepsWithSubSteps.forEach(ss=>collapsedSubSubIds.add(ss.id));
+  } else if(!subStepsFullyExpanded){
+    // subtasks+steps visible -> also expand their sub-steps
+    stepsWithSubSteps.forEach(ss=>collapsedSubSubIds.delete(ss.id));
   } else {
-    // everything expanded -> collapse back down (pre-collapsing steps so the next expand starts at "subtasks only" again)
+    // everything expanded -> collapse back down (pre-collapsing steps/sub-steps so the next expand starts at "subtasks only" again)
     collapsedTaskIds.add(taskId);
     subtasksWithSteps.forEach(s=>collapsedSubIds.add(s.id));
-    if(inlineAddSubtaskTaskId===taskId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; }
+    stepsWithSubSteps.forEach(ss=>collapsedSubSubIds.add(ss.id));
+    if(inlineAddSubtaskTaskId===taskId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; inlineAddParentStepId=null; }
   }
   render();
 }
@@ -2403,7 +2536,16 @@ function toggleSubCollapse(subId){
     collapsedSubIds.delete(subId);
   } else {
     collapsedSubIds.add(subId);
-    if(inlineAddParentSubId===subId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; }
+    if(inlineAddParentSubId===subId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; inlineAddParentStepId=null; }
+  }
+  render();
+}
+function toggleSubSubCollapse(stepId){
+  if(collapsedSubSubIds.has(stepId)){
+    collapsedSubSubIds.delete(stepId);
+  } else {
+    collapsedSubSubIds.add(stepId);
+    if(inlineAddParentStepId===stepId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; inlineAddParentStepId=null; }
   }
   render();
 }
@@ -2426,6 +2568,10 @@ function toggleCollapseAllTasks(){
     (t.subtasks||[]).forEach(s=>{
       if((s.subtasks||[]).length===0) return;
       if(anyExpanded) collapsedSubIds.add(s.id); else collapsedSubIds.delete(s.id);
+      s.subtasks.forEach(ss=>{
+        if((ss.subtasks||[]).length===0) return;
+        if(anyExpanded) collapsedSubSubIds.add(ss.id); else collapsedSubSubIds.delete(ss.id);
+      });
     });
   });
   render();
@@ -2622,15 +2768,6 @@ function handleHierarchyDrop(e, taskId, targetType, targetSubId, targetStepId){
     return;
   }
 
-  if(draggedItem.type==='subtask' && targetType==='step'){
-    const srcSub = t.subtasks.find(s=>s.id===draggedItem.subId);
-    if(srcSub && (srcSub.subtasks||[]).length>0){
-      showToast("This subtask has its own steps — remove or promote them first", true);
-      draggedItem = null;
-      return;
-    }
-  }
-
   let draggedObj;
   if(draggedItem.type==='subtask'){
     const srcIdx = t.subtasks.findIndex(s=>s.id===draggedItem.subId);
@@ -2644,6 +2781,11 @@ function handleHierarchyDrop(e, taskId, targetType, targetSubId, targetStepId){
     draggedObj = srcSub.subtasks.splice(srcIdx,1)[0];
   }
 
+  // Neither branch below ever strips draggedObj.subtasks — a dragged item's
+  // own children always travel with it (a promoted subtask's steps stay its
+  // steps; a demoted subtask's steps become the new step's sub-steps; a
+  // step's own sub-steps survive a same-level reorder). Only defaulted to []
+  // when entirely missing, never wiped when already present.
   if(targetType==='subtask'){
     if(!Array.isArray(draggedObj.subtasks)) draggedObj.subtasks = [];
     const targetIdx = t.subtasks.findIndex(s=>s.id===targetSubId);
@@ -2656,7 +2798,6 @@ function handleHierarchyDrop(e, taskId, targetType, targetSubId, targetStepId){
       draggedItem = null;
       return;
     }
-    delete draggedObj.subtasks;
     if(!Array.isArray(targetSub.subtasks)) targetSub.subtasks = [];
     const targetIdx = targetSub.subtasks.findIndex(x=>x.id===targetStepId);
     const insertAt = targetIdx===-1 ? targetSub.subtasks.length : (zone==='top' ? targetIdx : targetIdx+1);
@@ -2664,6 +2805,58 @@ function handleHierarchyDrop(e, taskId, targetType, targetSubId, targetStepId){
   }
 
   draggedItem = null;
+  t.updatedAt = Date.now();
+  save(); render();
+}
+
+// Sub-step drag-and-drop is deliberately a separate, much simpler system from
+// the Subtask<->Step one above — same-parent reordering only, no cross-parent
+// moves (see CLAUDE.md). draggedSubstep/handleSubstepDrag* never touch
+// draggedItem/handleHierarchyDrag*; the stepId equality check in DragOver/Drop
+// is what enforces "same parent only".
+let draggedSubstep = null; // {taskId, subId, stepId, substepId}
+function handleSubstepDragStart(e, taskId, subId, stepId, substepId){
+  draggedSubstep = {taskId, subId, stepId, substepId};
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', substepId);
+  e.currentTarget.classList.add('dragging');
+}
+function handleSubstepDragEnd(e){
+  draggedSubstep = null;
+  document.querySelectorAll('.subtask-row.dragging,.task-subtask-row.dragging').forEach(el=>el.classList.remove('dragging'));
+  document.querySelectorAll('.subtask-row.drag-over-top,.subtask-row.drag-over-bottom,.task-subtask-row.drag-over-top,.task-subtask-row.drag-over-bottom').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom'));
+}
+function handleSubstepDragOver(e, stepId, substepId){
+  if(!draggedSubstep || draggedSubstep.stepId!==stepId || draggedSubstep.substepId===substepId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const row = e.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const zone = (e.clientY - rect.top) / rect.height < 0.5 ? 'top' : 'bottom';
+  row.classList.remove('drag-over-top','drag-over-bottom');
+  row.classList.add(zone==='top' ? 'drag-over-top' : 'drag-over-bottom');
+}
+function handleSubstepDragLeave(e){
+  e.currentTarget.classList.remove('drag-over-top','drag-over-bottom');
+}
+function handleSubstepDrop(e, taskId, subId, stepId, targetSubstepId){
+  if(!draggedSubstep || draggedSubstep.stepId!==stepId || draggedSubstep.substepId===targetSubstepId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const row = e.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const zone = (e.clientY - rect.top) / rect.height < 0.5 ? 'top' : 'bottom';
+  row.classList.remove('drag-over-top','drag-over-bottom');
+  const t = tasks.find(x=>x.id===taskId); if(!t){ draggedSubstep=null; return; }
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s){ draggedSubstep=null; return; }
+  const ss = (s.subtasks||[]).find(x=>x.id===stepId); if(!ss){ draggedSubstep=null; return; }
+  const srcIdx = (ss.subtasks||[]).findIndex(x=>x.id===draggedSubstep.substepId);
+  if(srcIdx===-1){ draggedSubstep=null; return; }
+  const [obj] = ss.subtasks.splice(srcIdx,1);
+  const targetIdx = ss.subtasks.findIndex(x=>x.id===targetSubstepId);
+  const insertAt = targetIdx===-1 ? ss.subtasks.length : (zone==='top' ? targetIdx : targetIdx+1);
+  ss.subtasks.splice(insertAt, 0, obj);
+  draggedSubstep = null;
   t.updatedAt = Date.now();
   save(); render();
 }
@@ -2699,13 +2892,45 @@ function outdentDrawerSubtaskInput(taskId, subId){
   const newInput = document.getElementById('newSubtaskInput');
   if(newInput){ newInput.value = val; newInput.focus(); }
 }
+function toggleDrawerSubStepsPanel(stepId){
+  if(drawerExpandedStepIds.has(stepId)) drawerExpandedStepIds.delete(stepId);
+  else drawerExpandedStepIds.add(stepId);
+  renderDrawer();
+}
+function indentDrawerSubSubtaskInput(taskId, subId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const input = document.getElementById(`newSubSubtaskInput-${subId}`);
+  const val = input ? input.value.trim() : '';
+  let carryOverText = val;
+  if(!Array.isArray(s.subtasks)) s.subtasks=[];
+  if(!s.subtasks.length){
+    if(!val) return;
+    s.subtasks.push({id:genId(), text:val, done:false});
+    t.updatedAt = Date.now();
+    save();
+    carryOverText = '';
+  }
+  const lastStep = s.subtasks[s.subtasks.length-1];
+  drawerExpandedStepIds.add(lastStep.id);
+  renderDrawer();
+  const newInput = document.getElementById(`newSubSubSubtaskInput-${lastStep.id}`);
+  if(newInput){ newInput.value = carryOverText; newInput.focus(); }
+}
+function outdentDrawerSubSubtaskInput(taskId, subId, stepId){
+  const input = document.getElementById(`newSubSubSubtaskInput-${stepId}`);
+  const val = input ? input.value : '';
+  renderDrawer();
+  const newInput = document.getElementById(`newSubSubtaskInput-${subId}`);
+  if(newInput){ newInput.value = val; newInput.focus(); }
+}
 function promoteStepToSubtask(taskId, subId, stepId){
   const t = tasks.find(x=>x.id===taskId); if(!t) return;
   const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
   const idx = (s.subtasks||[]).findIndex(x=>x.id===stepId);
   if(idx===-1) return;
   const [step] = s.subtasks.splice(idx,1);
-  step.subtasks = [];
+  if(!Array.isArray(step.subtasks)) step.subtasks = [];
   const parentIdx = t.subtasks.findIndex(x=>x.id===subId);
   t.subtasks.splice(parentIdx+1, 0, step);
   t.updatedAt = Date.now();
@@ -2716,12 +2941,38 @@ function demoteSubtaskToStep(taskId, subId){
   const idx = t.subtasks.findIndex(x=>x.id===subId);
   if(idx<=0){ showToast("Move this below another subtask first", true); return; }
   const s = t.subtasks[idx];
-  if((s.subtasks||[]).length>0){ showToast("This subtask has its own steps — remove or promote them first", true); return; }
   const prevSub = t.subtasks[idx-1];
   t.subtasks.splice(idx,1);
   if(!Array.isArray(prevSub.subtasks)) prevSub.subtasks=[];
   prevSub.subtasks.push(s);
   drawerExpandedSubIds.add(prevSub.id);
+  t.updatedAt = Date.now();
+  save(); render();
+}
+function promoteSubSubtaskToStep(taskId, subId, stepId, subSubSubId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const ss = (s.subtasks||[]).find(x=>x.id===stepId); if(!ss) return;
+  const idx = (ss.subtasks||[]).findIndex(x=>x.id===subSubSubId);
+  if(idx===-1) return;
+  const [subSubStep] = ss.subtasks.splice(idx,1);
+  const parentIdx = s.subtasks.findIndex(x=>x.id===stepId);
+  s.subtasks.splice(parentIdx+1, 0, subSubStep);
+  t.updatedAt = Date.now();
+  save(); render();
+}
+function demoteStepToSubSubtask(taskId, subId, stepId){
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const idx = s.subtasks.findIndex(x=>x.id===stepId);
+  if(idx<=0){ showToast("Move this below another step first", true); return; }
+  const ss = s.subtasks[idx];
+  if((ss.subtasks||[]).length>0){ showToast("This step has its own sub-steps — remove or promote them first", true); return; }
+  const prevStep = s.subtasks[idx-1];
+  s.subtasks.splice(idx,1);
+  if(!Array.isArray(prevStep.subtasks)) prevStep.subtasks=[];
+  prevStep.subtasks.push(ss);
+  drawerExpandedStepIds.add(prevStep.id);
   t.updatedAt = Date.now();
   save(); render();
 }
@@ -2860,7 +3111,7 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
-    closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; renamingTaskId=null; renamingSubtask=null; renamingSubSubtask=null; selectedTaskIds.clear(); kbdSelectedTaskId=null;
+    closeAllModals(); closeDrawer(); inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; inlineAddParentStepId=null; renamingTaskId=null; renamingSubtask=null; renamingSubSubtask=null; renamingSubSubSubtask=null; selectedTaskIds.clear(); kbdSelectedTaskId=null;
     if(viewMode==='board'){ renderBoard(); } else { renderList(); }
     renderBulkBar();
     const el = document.activeElement;
@@ -2965,6 +3216,7 @@ function outdentInlineSubtaskInput(taskId){
   const input = document.getElementById(inputId);
   const val = input ? input.value : '';
   inlineAddParentSubId = null;
+  inlineAddParentStepId = null;
   render();
   const newInput = document.getElementById(inputId);
   if(newInput){ newInput.value = val; newInput.focus(); }
@@ -2979,6 +3231,51 @@ function addInlineSubSubtask(taskId, subId){
   const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
   if(!Array.isArray(s.subtasks)) s.subtasks=[];
   s.subtasks.push({id:genId(), text, done:false});
+  t.updatedAt = Date.now();
+  save(); render();
+  document.getElementById(inputId)?.focus();
+}
+function indentInlineSubSubtaskInput(taskId, subId){
+  const inputId = viewMode==='board' ? 'inlineSubtaskInputBoard' : 'inlineSubtaskInput';
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const input = document.getElementById(inputId);
+  const val = input ? input.value.trim() : '';
+  let carryOverText = val;
+  if(!Array.isArray(s.subtasks)) s.subtasks=[];
+  if(!s.subtasks.length){
+    if(!val) return;
+    s.subtasks.push({id:genId(), text:val, done:false});
+    t.updatedAt = Date.now();
+    save();
+    carryOverText = '';
+  }
+  inlineAddParentStepId = s.subtasks[s.subtasks.length-1].id;
+  collapsedSubSubIds.delete(inlineAddParentStepId);
+  render();
+  const newInput = document.getElementById(inputId);
+  if(newInput){ newInput.value = carryOverText; newInput.focus(); }
+}
+function outdentInlineSubSubtaskInput(taskId, subId){
+  const inputId = viewMode==='board' ? 'inlineSubtaskInputBoard' : 'inlineSubtaskInput';
+  const input = document.getElementById(inputId);
+  const val = input ? input.value : '';
+  inlineAddParentStepId = null;
+  render();
+  const newInput = document.getElementById(inputId);
+  if(newInput){ newInput.value = val; newInput.focus(); }
+}
+function addInlineSubSubSubtask(taskId, subId, stepId){
+  const inputId = viewMode==='board' ? 'inlineSubtaskInputBoard' : 'inlineSubtaskInput';
+  const input = document.getElementById(inputId);
+  if(!input) return;
+  const text = input.value.trim();
+  if(!text) return;
+  const t = tasks.find(x=>x.id===taskId); if(!t) return;
+  const s = (t.subtasks||[]).find(x=>x.id===subId); if(!s) return;
+  const ss = (s.subtasks||[]).find(x=>x.id===stepId); if(!ss) return;
+  if(!Array.isArray(ss.subtasks)) ss.subtasks=[];
+  ss.subtasks.push({id:genId(), text, done:false});
   t.updatedAt = Date.now();
   save(); render();
   document.getElementById(inputId)?.focus();
@@ -3002,6 +3299,7 @@ function handleListKeyNav(e){
     if(!kbdSelectedTaskId || !list.some(t=>t.id===kbdSelectedTaskId)) return;
     inlineAddSubtaskTaskId = kbdSelectedTaskId;
     inlineAddParentSubId = null;
+    inlineAddParentStepId = null;
     collapsedTaskIds.delete(kbdSelectedTaskId);
     renderList();
     document.getElementById('inlineSubtaskInput')?.focus();
@@ -3028,6 +3326,7 @@ function handleListKeyNav(e){
   const hadInlineAdd = inlineAddSubtaskTaskId !== null;
   inlineAddSubtaskTaskId = null;
   inlineAddParentSubId = null;
+  inlineAddParentStepId = null;
   const idx = list.findIndex(t=>t.id===kbdSelectedTaskId);
   let next;
   if(idx===-1) next = 0;

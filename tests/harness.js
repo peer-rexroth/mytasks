@@ -147,12 +147,13 @@ async function run(argv) {
   tasks = defaultTasks();
   deletedTaskIds = []; deletedProjectIds = []; allTasksHiddenProjectIds = [];
   activeTaskId = null; kbdSelectedTaskId = null; renamingTaskId = null;
-  renamingSubtask = null; renamingSubSubtask = null;
+  renamingSubtask = null; renamingSubSubtask = null; renamingSubSubSubtask = null;
   selectedTaskIds = new Set(); lastClickedTaskId = null;
-  inlineAddSubtaskTaskId = null; inlineAddParentSubId = null;
-  justCompletedTaskId = null; justCompletedSubId = null; justCompletedSubSubId = null;
-  collapsedTaskIds = new Set(); collapsedSubIds = new Set(); drawerExpandedSubIds = new Set();
-  showAllCompletedList = false; expandedCompletedProjects = new Set(); draggedItem = null;
+  inlineAddSubtaskTaskId = null; inlineAddParentSubId = null; inlineAddParentStepId = null;
+  justCompletedTaskId = null; justCompletedSubId = null; justCompletedSubSubId = null; justCompletedSubSubSubId = null;
+  collapsedTaskIds = new Set(); collapsedSubIds = new Set(); collapsedSubSubIds = new Set();
+  drawerExpandedSubIds = new Set(); drawerExpandedStepIds = new Set();
+  showAllCompletedList = false; expandedCompletedProjects = new Set(); draggedItem = null; draggedSubstep = null;
   filterProjectId = null; filterStatus = STATUSES.map(s=>s.id); filterPriority = PRIORITIES.map(p=>p.id); filterTags = [];
   myDayFilter = false; thisWeekFilter = false; overdueFilter = false;
   searchQuery = ''; sortBy = 'smart'; viewMode = 'list'; currentTheme = 'light'; colorScheme = 'standard'; compactMode = true;

@@ -40,6 +40,12 @@ test('subtask missing its own subtasks array gets one', function () {
   assertDeepEqual(tasks[0].subtasks[0].subtasks, []);
 });
 
+test('step missing its own subtasks array gets one (sub-step support)', function () {
+  tasks = [{ id: 't1', title: 'T', projectId: 'proj-inbox', subtasks: [{ id: 's1', text: 'Sub', done: false, subtasks: [{ id: 'st1', text: 'sub-step-holder', done: false }] }] }];
+  normalizeData();
+  assertDeepEqual(tasks[0].subtasks[0].subtasks[0].subtasks, []);
+});
+
 test('unknown tag ids are dropped, known ones kept', function () {
   tasks = [{ id: 't1', title: 'T', projectId: 'proj-inbox', tags: ['deep-work', 'not-a-real-tag'] }];
   normalizeData();
@@ -72,14 +78,15 @@ test('a task id containing HTML-breaking characters gets regenerated', function 
   assertTrue(isSafeId(tasks[0].id), 'the unsafe id should have been replaced');
 });
 
-test('a subtask/step id containing HTML-breaking characters gets regenerated', function () {
+test('a subtask/step/sub-step id containing HTML-breaking characters gets regenerated', function () {
   tasks = [{
     id: 't1', title: 'T', projectId: 'proj-inbox',
-    subtasks: [{ id: 's"onmouseover=alert(1)', text: 'Sub', done: false, subtasks: [{ id: 'st\'});alert(1);(\'', text: 'Step', done: false }] }]
+    subtasks: [{ id: 's"onmouseover=alert(1)', text: 'Sub', done: false, subtasks: [{ id: 'st\'});alert(1);(\'', text: 'Step', done: false, subtasks: [{ id: 'sst"><script>alert(1)</script>', text: 'Sub-step', done: false }] }] }]
   }];
   normalizeData();
   assertTrue(isSafeId(tasks[0].subtasks[0].id), 'the unsafe subtask id should have been replaced');
   assertTrue(isSafeId(tasks[0].subtasks[0].subtasks[0].id), 'the unsafe step id should have been replaced');
+  assertTrue(isSafeId(tasks[0].subtasks[0].subtasks[0].subtasks[0].id), 'the unsafe sub-step id should have been replaced');
 });
 
 test('a project id containing HTML-breaking characters gets regenerated', function () {

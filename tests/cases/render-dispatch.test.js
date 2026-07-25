@@ -26,6 +26,16 @@ test('toggleSubCollapse re-renders board view when viewMode is board', function 
   assertTrue(document.getElementById('board').innerHTML.length > 0, 'render() should have repainted #board, not just #taskList');
 });
 
+test('toggleSubSubCollapse re-renders board view when viewMode is board', function () {
+  tasks = [dispatchFixtureTask()];
+  viewMode = 'board';
+  tasks[0].subtasks = [{ id: 's1', text: 'Sub', done: false, subtasks: [{ id: 'st1', text: 'Step', done: false, subtasks: [{ id: 'sst1', text: 'Sub-step', done: false }] }] }];
+  render();
+  document.getElementById('board').innerHTML = '';
+  toggleSubSubCollapse('st1');
+  assertTrue(document.getElementById('board').innerHTML.length > 0, 'render() should have repainted #board, not just #taskList');
+});
+
 test('toggleTaskDone re-renders whichever view is active', function () {
   tasks = [dispatchFixtureTask()];
   viewMode = 'board';
