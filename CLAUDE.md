@@ -152,16 +152,17 @@ and they are **deliberately not at feature parity**:
   list view, plus this is the only place with a permanent (not hover-only)
   UI for it, since it's a dedicated single-task editor.
 - **Board view** (`boardCardHtml`, `renderBoard`) — intentionally lighter.
-  Subtasks support toggle/rename/add (mirroring list view), but steps are
-  strictly read + toggle-done only — no rename/delete/drag for steps on a
-  card. **Sub-steps don't render on a board card at all** — `boardCardHtml()`
-  never descends into a step's `subtasks` array, the same reduced-parity
-  reasoning extended one level further. There is also **no drag-and-drop**
-  for subtasks/steps within a card. Reason: `.board-card` is itself
-  `draggable="true"` for column-to-column moves; nesting another
-  `draggable="true"` row inside it is unreliable across browsers. Card
-  height is also a real constraint (kanban columns want roughly uniform
-  card heights), which is why steps collapse by default there.
+  Subtasks support toggle/rename/add (mirroring list view), but steps and
+  sub-steps are strictly read + toggle-done only — no rename/delete/add/drag
+  for either on a card. Sub-steps share the same chevron/collapse pattern as
+  steps (`collapsedSubSubIds`, the same Set list view uses, so collapsing a
+  step's sub-steps in one view collapses it everywhere). There is also **no
+  drag-and-drop** for subtasks/steps/sub-steps within a card. Reason:
+  `.board-card` is itself `draggable="true"` for column-to-column moves;
+  nesting another `draggable="true"` row inside it is unreliable across
+  browsers. Card height is also a real constraint (kanban columns want
+  roughly uniform heights), which is why steps (and now sub-steps) collapse
+  by default there.
 
   Board columns are **projects**, not status (`getBoardColumns()` maps over
   `projects`, one column each). Status is a per-card badge instead, and
@@ -185,13 +186,13 @@ board, and drawer renders, so toggling something in one view is reflected in
 the others:
 
 - `collapsedTaskIds` / `collapsedSubIds` / `collapsedSubSubIds` — Sets of
-  task/subtask/step ids whose children are collapsed. `collapsedTaskIds` and
-  `collapsedSubIds` are read by both `renderList()` and `boardCardHtml()`;
-  `collapsedSubSubIds` (step-level collapse, new once steps could have
-  sub-steps) is list-view/drawer-only since board never renders sub-steps.
-  Any function that mutates these must call the general `render()`, not
-  `renderList()` or `renderBoard()` specifically — this exact mistake (calling
-  the wrong one) has caused several real "the button does nothing" bugs.
+  task/subtask/step ids whose children are collapsed, all three read by both
+  `renderList()` and `boardCardHtml()` (`collapsedSubSubIds`, step-level
+  collapse, is new alongside sub-steps, and board renders sub-steps too —
+  see "Views and where features live" above). Any function that mutates
+  these must call the general `render()`, not `renderList()` or
+  `renderBoard()` specifically — this exact mistake (calling the wrong one)
+  has caused several real "the button does nothing" bugs.
   `toggleTaskCollapseDeep()` cycles a task through all 4 stages (task
   collapsed → subtasks visible → steps visible → sub-steps visible →
   collapse back down), touching all three Sets in turn.

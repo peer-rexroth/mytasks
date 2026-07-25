@@ -65,15 +65,26 @@ test('handleBoardDrop is a no-op when nothing is being dragged', function () {
   assertEqual(JSON.stringify(tasks), before);
 });
 
-// Regression guard: board cards deliberately stop at Step (read + toggle-done
-// only, see CLAUDE.md) — a step's own sub-steps should never leak into the
-// board card, even though they now exist in the data model.
-test('boardCardHtml never renders a step\'s own sub-steps', function () {
+// Board cards show sub-steps read + toggle-done only (same reduced
+// treatment steps themselves already get there) — no rename/delete/add/drag.
+test('boardCardHtml renders a step\'s own sub-steps, read + toggle-done only', function () {
+  const t = {
+    id: 't1', title: 'Task', projectId: 'proj-inbox', status: 'todo', priority: 'medium', tags: [],
+    subtasks: [{ id: 's1', text: 'Sub', done: false, subtasks: [{ id: 'st1', text: 'Step', done: false, subtasks: [{ id: 'sst1', text: 'Visible sub-step', done: false }] }] }]
+  };
+  const html = boardCardHtml(t);
+  assertIncludes(html, 'Step');
+  assertIncludes(html, 'Visible sub-step');
+  assertIncludes(html, "toggleSubSubSubtask('t1','s1','st1','sst1')");
+  assertNotIncludes(html, 'renameSubSubSubtaskInputBoard', 'sub-steps should have no rename affordance on board');
+});
+
+test('boardCardHtml hides a step\'s sub-steps when collapsedSubSubIds has that step (shared with list view)', function () {
   const t = {
     id: 't1', title: 'Task', projectId: 'proj-inbox', status: 'todo', priority: 'medium', tags: [],
     subtasks: [{ id: 's1', text: 'Sub', done: false, subtasks: [{ id: 'st1', text: 'Step', done: false, subtasks: [{ id: 'sst1', text: 'Hidden sub-step', done: false }] }] }]
   };
+  collapsedSubSubIds.add('st1');
   const html = boardCardHtml(t);
-  assertIncludes(html, 'Step');
   assertNotIncludes(html, 'Hidden sub-step');
 });

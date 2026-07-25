@@ -1565,7 +1565,14 @@ function boardCardHtml(t){
         <div class="task-subtask-row ${ss.done?'done':''}">
           <div class="mini-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
           <span onclick="event.stopPropagation()">${highlightMatch(ss.text, searchQuery)}</span>
+          ${(ss.subtasks||[]).length>0?`<button class="icon-btn subtask-toggle" onclick="event.stopPropagation();toggleSubSubCollapse('${ss.id}');this.blur()" title="${collapsedSubSubIds.has(ss.id)?'Expand':'Collapse'} sub-steps"><i class="fa-solid fa-chevron-${collapsedSubSubIds.has(ss.id)?'right':'down'}"></i></button>`:''}
         </div>
+        ${(ss.subtasks||[]).length>0 && !collapsedSubSubIds.has(ss.id)?`<div class="task-subtasks" style="margin-left:21px">${ss.subtasks.map(sss=>`
+          <div class="task-subtask-row ${sss.done?'done':''}">
+            <div class="mini-check ${sss.done?'checked':''} ${sss.id===justCompletedSubSubSubId?'pop':''}" role="checkbox" aria-checked="${sss.done}" aria-label="Mark sub-step done" tabindex="0" onclick="event.stopPropagation();toggleSubSubSubtask('${t.id}','${s.id}','${ss.id}','${sss.id}')"><i class="fa-solid fa-check"></i></div>
+            <span onclick="event.stopPropagation()">${highlightMatch(sss.text, searchQuery)}</span>
+          </div>
+        `).join('')}</div>`:''}
       `).join('')}${inlineAddSubtaskTaskId===t.id && inlineAddParentSubId===s.id?`<div class="task-subtask-add-row" onclick="event.stopPropagation()">
         <input spellcheck="true" type="text" id="inlineSubtaskInputBoard" placeholder="Add a step and press Enter…" onkeydown="if(event.key==='Enter'){event.preventDefault();addInlineSubSubtask('${t.id}','${s.id}')} else if(event.key==='Tab'){event.preventDefault();outdentInlineSubtaskInput('${t.id}');}">
       </div>`:''}</div>`:''}
