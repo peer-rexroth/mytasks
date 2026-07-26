@@ -1379,7 +1379,7 @@ function renderSidebar(){
 }
 
 const sortComparators = {
-  smart: (a,b)=>{ const pr={high:0,medium:1,low:2}; if(pr[a.priority]!==pr[b.priority]) return pr[a.priority]-pr[b.priority]; const ad=a.dueDate||'9999-99-99', bd=b.dueDate||'9999-99-99'; if(ad!==bd) return ad<bd?-1:1; return b.createdAt-a.createdAt; },
+  smart: (a,b)=>{ const pr={high:0,medium:1,low:2}; if(pr[a.priority]!==pr[b.priority]) return pr[a.priority]-pr[b.priority]; const ad=a.dueDate||'9999-99-99', bd=b.dueDate||'9999-99-99'; if(ad!==bd) return ad<bd?-1:1; const st={doing:0,todo:1,done:2}; if(st[a.status]!==st[b.status]) return st[a.status]-st[b.status]; return b.createdAt-a.createdAt; },
   due: (a,b)=>{ const ad=a.dueDate||'9999-99-99', bd=b.dueDate||'9999-99-99'; return ad<bd?-1:ad>bd?1:0; },
   priority: (a,b)=>{ const pr={high:0,medium:1,low:2}; return pr[a.priority]-pr[b.priority]; },
   created: (a,b)=> b.createdAt-a.createdAt,

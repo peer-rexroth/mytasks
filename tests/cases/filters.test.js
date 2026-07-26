@@ -99,3 +99,22 @@ test('getFilteredSortedTasks always sorts done tasks after not-done tasks', func
   const sorted = getFilteredSortedTasks();
   assertEqual(sorted[sorted.length - 1].status, 'done');
 });
+
+test('smart sort breaks a priority+due-date tie by status, In Progress before Not Started', function () {
+  tasks = [
+    { id: 't1', title: 'Not started one', projectId: 'proj-inbox', status: 'todo', priority: 'medium', dueDate: '2026-01-01', subtasks: [], tags: [], createdAt: 100 },
+    { id: 't2', title: 'In progress one', projectId: 'proj-inbox', status: 'doing', priority: 'medium', dueDate: '2026-01-01', subtasks: [], tags: [], createdAt: 100 }
+  ];
+  const sorted = getFilteredSortedTasks();
+  assertEqual(sorted[0].id, 't2', 'In Progress should sort before Not Started when priority and due date tie');
+  assertEqual(sorted[1].id, 't1');
+});
+
+test('smart sort still falls back to createdAt when priority, due date, and status all tie', function () {
+  tasks = [
+    { id: 't1', title: 'Older', projectId: 'proj-inbox', status: 'todo', priority: 'medium', dueDate: null, subtasks: [], tags: [], createdAt: 100 },
+    { id: 't2', title: 'Newer', projectId: 'proj-inbox', status: 'todo', priority: 'medium', dueDate: null, subtasks: [], tags: [], createdAt: 200 }
+  ];
+  const sorted = getFilteredSortedTasks();
+  assertEqual(sorted[0].id, 't2', 'newest-created should still win the final tiebreak');
+});
