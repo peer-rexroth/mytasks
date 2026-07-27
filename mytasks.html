@@ -1476,7 +1476,7 @@ function renderList(){
         <div class="task-subtask-row ${s.done?'done':''}" draggable="true"
           ondragstart="handleHierarchyDragStart(event,'subtask','${s.id}')" ondragend="handleHierarchyDragEnd(event)"
           ondragover="handleHierarchyDragOver(event,'subtask','${s.id}')" ondragleave="handleHierarchyDragLeave(event)" ondrop="handleHierarchyDrop(event,'${t.id}','subtask','${s.id}')">
-          ${(s.subtasks||[]).length>0?`<button class="icon-btn subtask-toggle" onclick="event.stopPropagation();toggleSubCollapse('${s.id}');this.blur()" title="${collapsedSubIds.has(s.id)?'Expand':'Collapse'} steps"><i class="fa-solid fa-chevron-${collapsedSubIds.has(s.id)?'right':'down'}"></i></button>`:''}
+          <button class="icon-btn subtask-toggle" onclick="event.stopPropagation();${(s.subtasks||[]).length>0?`toggleSubCollapse('${s.id}')`:`openAddStepForSubtask('${t.id}','${s.id}')`};this.blur()" title="${(s.subtasks||[]).length>0?`${collapsedSubIds.has(s.id)?'Expand':'Collapse'} steps`:'Add steps'}"><i class="fa-solid fa-${(s.subtasks||[]).length>0?`chevron-${collapsedSubIds.has(s.id)?'right':'down'}`:'plus'}"></i></button>
           <div class="mini-check ${s.done?'checked':''} ${s.id===justCompletedSubId?'pop':''}" role="checkbox" aria-checked="${s.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubtask('${t.id}','${s.id}')"><i class="fa-solid fa-check"></i></div>
           ${renamingSubtask && renamingSubtask.taskId===t.id && renamingSubtask.subId===s.id
             ? `<input spellcheck="true" type="text" class="task-subtask-text-input" id="renameSubtaskInputList" value="${esc(s.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubtask('${t.id}','${s.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubtask(); } else if(event.key==='Tab'){ event.preventDefault(); this.blur(); }">`
@@ -1488,7 +1488,7 @@ function renderList(){
           <div class="task-subtask-row ${ss.done?'done':''}" draggable="true"
             ondragstart="handleHierarchyDragStart(event,'step','${s.id}','${ss.id}')" ondragend="handleHierarchyDragEnd(event)"
             ondragover="handleHierarchyDragOver(event,'step','${s.id}','${ss.id}')" ondragleave="handleHierarchyDragLeave(event)" ondrop="handleHierarchyDrop(event,'${t.id}','step','${s.id}','${ss.id}')">
-            ${(ss.subtasks||[]).length>0?`<button class="icon-btn subtask-toggle" onclick="event.stopPropagation();toggleSubSubCollapse('${ss.id}');this.blur()" title="${collapsedSubSubIds.has(ss.id)?'Expand':'Collapse'} sub-steps"><i class="fa-solid fa-chevron-${collapsedSubSubIds.has(ss.id)?'right':'down'}"></i></button>`:''}
+            <button class="icon-btn subtask-toggle" onclick="event.stopPropagation();${(ss.subtasks||[]).length>0?`toggleSubSubCollapse('${ss.id}')`:`openAddSubStepForStep('${t.id}','${s.id}','${ss.id}')`};this.blur()" title="${(ss.subtasks||[]).length>0?`${collapsedSubSubIds.has(ss.id)?'Expand':'Collapse'} sub-steps`:'Add sub-steps'}"><i class="fa-solid fa-${(ss.subtasks||[]).length>0?`chevron-${collapsedSubSubIds.has(ss.id)?'right':'down'}`:'plus'}"></i></button>
             <div class="mini-check ${ss.done?'checked':''} ${ss.id===justCompletedSubSubId?'pop':''}" role="checkbox" aria-checked="${ss.done}" aria-label="Mark subtask done" tabindex="0" onclick="event.stopPropagation();toggleSubSubtask('${t.id}','${s.id}','${ss.id}')"><i class="fa-solid fa-check"></i></div>
             ${renamingSubSubtask && renamingSubSubtask.taskId===t.id && renamingSubSubtask.subId===s.id && renamingSubSubtask.subSubId===ss.id
               ? `<input spellcheck="true" type="text" class="task-subtask-text-input" id="renameSubSubtaskInputList" value="${esc(ss.text)}" onclick="event.stopPropagation()" onblur="commitRenameSubSubtask('${t.id}','${s.id}','${ss.id}', this.value)" onkeydown="event.stopPropagation(); if(event.key==='Enter'){ this.blur(); } else if(event.key==='Escape'){ event.preventDefault(); cancelRenameSubSubtask(); } else if(event.key==='Tab'){ event.preventDefault(); this.blur(); }">`
@@ -2555,6 +2555,31 @@ function toggleSubSubCollapse(stepId){
     if(inlineAddParentStepId===stepId){ inlineAddSubtaskTaskId=null; inlineAddParentSubId=null; inlineAddParentStepId=null; }
   }
   render();
+}
+// A subtask/step with zero children today has no chevron at all (there's
+// nothing to expand/collapse), which meant list view had no way to open the
+// add-box for it ever again once created — only the Tab-chain, mid-creation,
+// could reach it. That's invisible for brand-new items (you're still in the
+// chain) but breaks for anything saved earlier, e.g. an imported task whose
+// steps all start with zero sub-steps. These give the row's button a second
+// job when empty: open the add-box instead of toggling a collapse that has
+// nothing to show. Drawer never had this gap — its toggle button already
+// renders unconditionally with a "+" icon when empty (see renderDrawer()).
+function openAddStepForSubtask(taskId, subId){
+  inlineAddSubtaskTaskId = taskId;
+  inlineAddParentSubId = subId;
+  inlineAddParentStepId = null;
+  collapsedSubIds.delete(subId);
+  render();
+  document.getElementById('inlineSubtaskInput')?.focus();
+}
+function openAddSubStepForStep(taskId, subId, stepId){
+  inlineAddSubtaskTaskId = taskId;
+  inlineAddParentSubId = subId;
+  inlineAddParentStepId = stepId;
+  collapsedSubSubIds.delete(stepId);
+  render();
+  document.getElementById('inlineSubtaskInput')?.focus();
 }
 function getVisibleTasksForCollapse(){
   // Must match getBoardColumns()'s ignore axis — board view ignores the

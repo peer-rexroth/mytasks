@@ -178,3 +178,29 @@ test('handleSubstepDrop does nothing when the target sub-step belongs to a diffe
   assertEqual(tasks[0].subtasks[0].subtasks[0].subtasks.length, 1, 'sst1 should still be under st1');
   assertEqual(tasks[0].subtasks[0].subtasks[1].subtasks.length, 1, 'sst2 should still be under st2, untouched');
 });
+
+// A subtask/step with zero children (e.g. every step in a task imported from
+// a pre-Sub-step export) has no chevron in list view — there was previously
+// no way to reopen its add-box once created, since only the Tab-chain
+// mid-creation could open it. openAddStepForSubtask/openAddSubStepForStep are
+// list view's chevron-button click targets for exactly that empty case.
+test('openAddStepForSubtask opens the step add-box for a subtask that has zero steps', function () {
+  tasks = [hierarchyFixtureTask()]; // s2 has subtasks: []
+  collapsedSubIds.add('s2'); // even if previously collapsed, opening add should un-collapse it
+  openAddStepForSubtask('t1', 's2');
+  assertEqual(inlineAddSubtaskTaskId, 't1');
+  assertEqual(inlineAddParentSubId, 's2');
+  assertEqual(inlineAddParentStepId, null);
+  assertFalse(collapsedSubIds.has('s2'), 'opening the add-box should un-collapse the subtask');
+});
+
+test('openAddSubStepForStep opens the sub-step add-box for a step that has zero sub-steps', function () {
+  tasks = [hierarchyFixtureTask()]; // st1 has no subtasks array at all until normalized
+  normalizeData();
+  collapsedSubSubIds.add('st1');
+  openAddSubStepForStep('t1', 's1', 'st1');
+  assertEqual(inlineAddSubtaskTaskId, 't1');
+  assertEqual(inlineAddParentSubId, 's1');
+  assertEqual(inlineAddParentStepId, 'st1');
+  assertFalse(collapsedSubSubIds.has('st1'), 'opening the add-box should un-collapse the step');
+});

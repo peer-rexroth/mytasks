@@ -143,7 +143,15 @@ and they are **deliberately not at feature parity**:
   for subtasks, steps, and sub-steps: add (inline input, Tab/Shift+Tab to
   indent/outdent — a 3-hop chain: subtask-add → step-add → sub-step-add),
   rename (dblclick), delete, promote/demote, collapse/expand (chevron,
-  hover-revealed hierarchy buttons). Drag-reorder works **across** parents
+  hover-revealed hierarchy buttons). The chevron button on a subtask/step row
+  does double duty: if it has children, it collapses/expands them
+  (`toggleSubCollapse`/`toggleSubSubCollapse`); if it has zero children (e.g.
+  every step in a task imported from a pre-Sub-step export, or any subtask/
+  step that was created and saved without ever adding a child during the
+  same Tab-chain session), it instead opens that row's add-box
+  (`openAddStepForSubtask`/`openAddSubStepForStep`, "+" icon) — otherwise
+  there would be no way to add a first child to it ever again once the
+  Tab-chain that created it had ended. Drag-reorder works **across** parents
   for subtasks/steps (`draggedItem`/`handleHierarchyDrop*`), but sub-steps
   only drag-reorder **within their own parent step** (`draggedSubstep`/
   `handleSubstepDrag*`, a deliberately separate, much simpler system — see
