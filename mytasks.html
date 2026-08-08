@@ -202,25 +202,21 @@
   html[data-theme="dark"] input[type="date"] { color-scheme: dark; }
 
   /* ── UI scale ──────────────────────────────────────────────────────────────
-     A plain CSS zoom on <html>, dragged via a 4-stop slider (Small/Medium/
-     Large/Extra Large — the same 4 sizes the original button-based picker
-     offered) in the topbar's text-size popover. Set directly as an inline
-     style (document.documentElement.style.zoom) rather than through CSS
-     attribute rules the way data-theme/data-scheme/data-density are, since
-     the slider's own thumb position (not a data-* attribute) is the thing
-     driving it. zoom is a Chromium/Safari-only CSS property (not Firefox)
-     — the same "Chrome/Edge is the primary target" stance the file-sync
-     feature already takes elsewhere in this app; on an unsupported browser
-     this is simply a no-op, never a crash. */
-  .ui-scale-panel { padding: 12px 14px; min-width: 190px; }
-  .ui-scale-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
-  .ui-scale-panel-header span:first-child { font-weight: 600; color: var(--text-2); }
-  .ui-scale-panel-header span:last-child { color: var(--text-3); }
-  /* Native tick marks (via the <datalist> wired to this input's own "list"
-     attribute) mark the 4 stops directly on the track — no separate label
-     row underneath needed; the current stop's name already shows in the
-     header above. */
-  .ui-scale-slider { width: 100%; accent-color: var(--blue-text); }
+     A plain CSS zoom on <html>, picked from a 4-way segmented control
+     (Small/Medium/Large/Extra Large) in the topbar's text-size popover —
+     reuses .view-switch/.view-switch-btn outright (the same pill the
+     List/Board toggle already uses) rather than a native <input
+     type="range">, whose own tick-mark rendering looked inconsistent and
+     not great across platforms. Set directly as an inline style
+     (document.documentElement.style.zoom), since there's no small, fixed
+     set of named steps a CSS attribute selector could map cleanly (see
+     data-theme/data-scheme/data-density for that pattern elsewhere). zoom
+     is a Chromium/Safari-only CSS property (not Firefox) — the same
+     "Chrome/Edge is the primary target" stance the file-sync feature
+     already takes elsewhere in this app; on an unsupported browser this
+     is simply a no-op, never a crash. */
+  .ui-scale-panel { padding: 10px 12px; }
+  .ui-scale-panel-header { font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 8px; }
 
   html, body { height: 100%; }
   body { font-family: var(--font); background: var(--bg-2); color: var(--text); font-size: 15px; line-height: 1.5; display: flex; flex-direction: column; min-height: 100vh; }
@@ -1003,9 +999,6 @@ function uiScaleStepIndex(pct){
 function clampUiScale(v){
   if(!isFinite(Number(v))) return UI_SCALE_DEFAULT;
   return UI_SCALE_STEPS[uiScaleStepIndex(v)].pct;
-}
-function uiScaleLabelFor(pct){
-  return UI_SCALE_STEPS[uiScaleStepIndex(pct)].label;
 }
 const THEME_SCHEMES = [
   { id: 'standard', name: 'Standard', desc: 'Neutral gray and white, with one blue accent.', swatches: ['#f5f5f3', '#0c447c', '#a32d2d'] },
@@ -3199,33 +3192,23 @@ function closeLibMenu(){ document.getElementById('libMenu')?.classList.remove('o
 function renderUiScaleMenu(){
   const el = document.getElementById('uiScaleMenu');
   if(!el) return;
-  const idx = uiScaleStepIndex(uiScale);
   el.innerHTML = `
     <div class="ui-scale-panel">
-      <div class="ui-scale-panel-header"><span>Text Size</span><span id="uiScaleValueLabel">${esc(uiScaleLabelFor(uiScale))}</span></div>
-      <input type="range" class="ui-scale-slider" id="uiScaleSlider" min="0" max="${UI_SCALE_STEPS.length-1}" step="1" value="${idx}" list="uiScaleTicks"
-        oninput="previewUiScale(UI_SCALE_STEPS[this.value].pct)" onchange="setUiScale(UI_SCALE_STEPS[this.value].pct)">
-      <datalist id="uiScaleTicks">${UI_SCALE_STEPS.map((s,i)=>`<option value="${i}"></option>`).join('')}</datalist>
+      <div class="ui-scale-panel-header">Text Size</div>
+      <div class="view-switch">${UI_SCALE_STEPS.map(s=>`
+        <button type="button" class="view-switch-btn${s.pct===uiScale?' active':''}" onclick="setUiScale(${s.pct})">${esc(s.label)}</button>
+      `).join('')}</div>
     </div>
   `;
 }
 function toggleUiScaleMenu(){ renderUiScaleMenu(); document.getElementById('uiScaleMenu')?.classList.toggle('open'); }
 function closeUiScaleMenu(){ document.getElementById('uiScaleMenu')?.classList.remove('open'); }
-// Live-updates the zoom + label while the slider is actually being
-// dragged — cheap, immediate, and deliberately does NOT touch
-// localStorage/save()/fileSyncWrite, so a mid-drag position never spams a
-// write. Only the 'change' event (fired once, on release) commits, via
-// setUiScale() below.
-function previewUiScale(v){
-  const val = clampUiScale(v);
-  document.documentElement.style.zoom = (val/100);
-  const label = document.getElementById('uiScaleValueLabel');
-  if(label) label.textContent = uiScaleLabelFor(val);
-}
 function setUiScale(v){
   uiScale = clampUiScale(v);
-  previewUiScale(uiScale);
+  document.documentElement.style.zoom = (uiScale/100);
   localStorage.setItem(UI_SCALE_KEY, String(uiScale));
+  renderUiScaleMenu();
+  closeUiScaleMenu();
   save();
 }
 

@@ -1,7 +1,8 @@
-// Text size slider (topbar text-height popover) — a 4-stop CSS zoom on
-// <html> (Small/Medium/Large/Extra Large — the same 4 sizes the original
-// button-based picker offered), persisted/synced the same way theme/
-// compactMode/colorScheme already are.
+// Text size segmented control (topbar text-height popover) — a 4-stop CSS
+// zoom on <html> (Small/Medium/Large/Extra Large), picked from a
+// .view-switch pill (the same segmented control the List/Board toggle
+// already uses), persisted/synced the same way theme/compactMode/
+// colorScheme already are.
 
 test('UI_SCALE_STEPS has exactly the 4 original named sizes, in order', function () {
   assertDeepEqual(UI_SCALE_STEPS.map(s => s.label), ['Small', 'Medium', 'Large', 'Extra Large']);
@@ -21,9 +22,9 @@ test('clampUiScale snaps any value to one of the 4 real stops', function () {
   assertEqual(clampUiScale('not-a-number'), UI_SCALE_DEFAULT, 'falls back to the default on garbage input');
 });
 
-test('uiScaleLabelFor names the stop a pct value snaps to', function () {
-  assertEqual(uiScaleLabelFor(90), 'Small');
-  assertEqual(uiScaleLabelFor(130), 'Extra Large');
+test('a fresh session with nothing saved defaults to Medium', function () {
+  assertEqual(uiScale, UI_SCALE_DEFAULT);
+  assertEqual(UI_SCALE_STEPS[uiScaleStepIndex(uiScale)].label, 'Medium');
 });
 
 test('setUiScale updates state, applies the zoom style, and localStorage', function () {
@@ -38,6 +39,12 @@ test('setUiScale snaps an off-stop value to the nearest real one before storing 
   assertEqual(uiScale, 130);
   setUiScale(103);
   assertEqual(uiScale, 100);
+});
+
+test('setUiScale closes the popover after picking a segment', function () {
+  document.getElementById('uiScaleMenu').classList.add('open');
+  setUiScale(90);
+  assertFalse(document.getElementById('uiScaleMenu').classList.contains('open'));
 });
 
 test('load() picks up a uiScale saved in the data blob, same as colorScheme', function () {
@@ -64,28 +71,31 @@ test('save() round-trips uiScale into the stored data blob', function () {
   assertEqual(saved.uiScale, 90);
 });
 
-test('previewUiScale applies the zoom and updates the label without persisting', function () {
-  setUiScale(100);
-  renderUiScaleMenu();
-  previewUiScale(130);
-  assertEqual(document.documentElement.style.zoom, 1.3, 'zoom applies immediately for live feedback');
-  assertEqual(uiScale, 100, 'state is not committed until setUiScale (the slider\'s change event) runs');
-  assertEqual(localStorage.getItem('mytasks_uiscale'), '100', 'localStorage is not touched by a mid-drag preview');
-  assertEqual(document.getElementById('uiScaleValueLabel').textContent, 'Extra Large');
-});
+// Pulls {label, active} out of each rendered segment button, in order —
+// avoids brittle substring matching against exact attribute ordering.
+function renderedUiScaleSegments(){
+  const html = document.getElementById('uiScaleMenu').innerHTML;
+  const re = /class="view-switch-btn( active)?"[^>]*>([^<]+)</g;
+  const out = [];
+  let m;
+  while((m = re.exec(html))) out.push({ label: m[2], active: !!m[1] });
+  return out;
+}
 
-test('renderUiScaleMenu builds a 4-stop slider (0-3) positioned at the current step, with native tick marks', function () {
+test('renderUiScaleMenu builds a 4-segment view-switch pill with the current stop marked active', function () {
   setUiScale(115);
   renderUiScaleMenu();
-  const html = document.getElementById('uiScaleMenu').innerHTML;
-  assertIncludes(html, 'min="0"');
-  assertIncludes(html, `max="${UI_SCALE_STEPS.length - 1}"`);
-  assertIncludes(html, 'step="1"');
-  assertIncludes(html, 'value="2"', 'Large is index 2');
-  assertIncludes(html, 'list="uiScaleTicks"', 'wired to a datalist for native tick marks on the track');
-  assertIncludes(html, 'Large', 'the header shows the current stop\'s name');
-  // one <option> per stop in the datalist, and nowhere else — no separate
-  // text-label row underneath the track any more
-  assertEqual((html.match(/<option/g) || []).length, UI_SCALE_STEPS.length);
-  assertNotIncludes(html, 'Extra Large', 'only the current stop\'s name shows, not every stop\'s label');
+  const segments = renderedUiScaleSegments();
+  assertDeepEqual(segments.map(s => s.label), ['Small', 'Medium', 'Large', 'Extra Large']);
+  assertEqual(segments.filter(s => s.active).length, 1, 'exactly one segment is marked active');
+  assertEqual(segments.find(s => s.active).label, 'Large', 'Large (115%) is the active segment');
+});
+
+test('renderUiScaleMenu moves the active segment when the scale changes', function () {
+  setUiScale(90);
+  renderUiScaleMenu();
+  assertEqual(renderedUiScaleSegments().find(s => s.active).label, 'Small');
+  setUiScale(130);
+  renderUiScaleMenu();
+  assertEqual(renderedUiScaleSegments().find(s => s.active).label, 'Extra Large');
 });
