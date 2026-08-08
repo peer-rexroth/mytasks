@@ -201,6 +201,21 @@
   input[type="date"] { color-scheme: light; }
   html[data-theme="dark"] input[type="date"] { color-scheme: dark; }
 
+  /* ── UI scale ──────────────────────────────────────────────────────────────
+     A plain CSS zoom on <html>, dragged via a slider in the topbar's
+     magnifying-glass popover — continuous (80%–150%, 5% steps), so it's
+     set directly as an inline style (document.documentElement.style.zoom)
+     rather than through a small, fixed set of CSS attribute rules the way
+     data-theme/data-scheme/data-density are. zoom is a Chromium/Safari-only
+     CSS property (not Firefox) — the same "Chrome/Edge is the primary
+     target" stance the file-sync feature already takes elsewhere in this
+     app; on an unsupported browser this is simply a no-op, never a crash. */
+  .ui-scale-panel { padding: 12px 14px; min-width: 190px; }
+  .ui-scale-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
+  .ui-scale-panel-header span:first-child { font-weight: 600; color: var(--text-2); }
+  .ui-scale-panel-header span:last-child { color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .ui-scale-slider { width: 100%; accent-color: var(--blue-text); }
+
   html, body { height: 100%; }
   body { font-family: var(--font); background: var(--bg-2); color: var(--text); font-size: 15px; line-height: 1.5; display: flex; flex-direction: column; min-height: 100vh; }
   body, .topbar, .sidebar, .main, .project-row, .nav-item,
@@ -624,6 +639,10 @@
       </div>
     </div>
     <button class="btn btn-icon btn-sm" onclick="toggleCompactMode()" title="Toggle compact view"><i class="fa-solid fa-expand" id="compactIcon"></i></button>
+    <div class="lib-dropdown" id="uiScaleDropdown">
+      <button class="btn btn-icon btn-sm" onclick="event.stopPropagation();toggleUiScaleMenu()" title="UI size"><i class="fa-solid fa-magnifying-glass"></i></button>
+      <div class="split-btn-menu" id="uiScaleMenu" style="left:auto;right:0;min-width:150px"></div>
+    </div>
     <button class="btn btn-icon btn-sm" onclick="openShortcutsModal()" title="Keyboard shortcuts"><i class="fa-solid fa-keyboard"></i></button>
     <button class="btn btn-icon btn-sm" onclick="openThemeModal()" title="Color scheme"><i class="fa-solid fa-palette"></i></button>
     <button class="btn btn-icon btn-sm" onclick="toggleTheme()" title="Toggle theme"><i class="fa-solid fa-circle-half-stroke" id="themeIcon"></i></button>
@@ -946,6 +965,20 @@ const THEME_KEY = 'mytasks_theme';
 const SCHEME_KEY = 'mytasks_scheme';
 const COMPACT_KEY = 'mytasks_compact';
 const VIEW_KEY = 'mytasks_view';
+const UI_SCALE_KEY = 'mytasks_uiscale';
+const UI_SCALE_MIN = 80;
+const UI_SCALE_MAX = 150;
+const UI_SCALE_STEP = 5;
+const UI_SCALE_DEFAULT = 100;
+// Rounds to the nearest step and clamps to [MIN,MAX] — used for any value
+// that could come from outside this session (localStorage, an incoming
+// synced file, a hand-edited import), not just the slider itself, which
+// already only ever produces on-step values on its own.
+function clampUiScale(v){
+  v = Math.round(Number(v) / UI_SCALE_STEP) * UI_SCALE_STEP;
+  if(!isFinite(v)) return UI_SCALE_DEFAULT;
+  return Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, v));
+}
 const THEME_SCHEMES = [
   { id: 'standard', name: 'Standard', desc: 'Neutral gray and white, with one blue accent.', swatches: ['#f5f5f3', '#0c447c', '#a32d2d'] },
   { id: 'modern', name: 'Modern', desc: 'Clean graphite and white, with a confident accent blue.', swatches: ['#f8f8f8', '#005fb8', '#cd3131'] },
@@ -1031,6 +1064,7 @@ let currentTheme = 'light';
 let colorScheme = 'standard';
 let compactMode = true;
 let viewMode = 'list';
+let uiScale = UI_SCALE_DEFAULT; // percent, e.g. 100 = 100%
 let draggingTaskId = null;
 let modalTarget = null, pendingImportData = null;
 let editingProjectId = null, newProjIcon = 'folder';
@@ -1044,6 +1078,7 @@ let editingProjectId = null, newProjIcon = 'folder';
 (function(){ const s=localStorage.getItem(SCHEME_KEY); if(s && THEME_SCHEMES.some(x=>x.id===s)){ colorScheme=s; } document.documentElement.setAttribute('data-scheme', colorScheme); })();
 (function(){ const c=localStorage.getItem(COMPACT_KEY); if(c!==null){compactMode = c==='1';} document.documentElement.setAttribute('data-density', compactMode?'compact':''); })();
 (function(){ const v=localStorage.getItem(VIEW_KEY); if(v==='board'||v==='list'){ viewMode=v; } })();
+(function(){ const z=localStorage.getItem(UI_SCALE_KEY); const n=parseInt(z,10); if(!isNaN(n)) uiScale=clampUiScale(n); document.documentElement.style.zoom = (uiScale/100); })();
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 function defaultProjects(){
@@ -1124,6 +1159,7 @@ function load(){
       if(d.colorScheme && THEME_SCHEMES.some(x=>x.id===d.colorScheme)){ colorScheme=d.colorScheme; document.documentElement.setAttribute('data-scheme',d.colorScheme); localStorage.setItem(SCHEME_KEY,d.colorScheme); }
       if(d.compactMode!==undefined){ compactMode=d.compactMode; document.documentElement.setAttribute('data-density', compactMode?'compact':''); localStorage.setItem(COMPACT_KEY, compactMode?'1':'0'); }
       if(d.viewMode==='board'||d.viewMode==='list'){ viewMode=d.viewMode; localStorage.setItem(VIEW_KEY, viewMode); }
+      if(d.uiScale!==undefined && !isNaN(parseInt(d.uiScale,10))){ uiScale=clampUiScale(d.uiScale); document.documentElement.style.zoom=(uiScale/100); localStorage.setItem(UI_SCALE_KEY,String(uiScale)); }
     } else {
       projects = defaultProjects();
       tasks = defaultTasks();
@@ -1135,7 +1171,7 @@ function load(){
   }
 }
 function save(){
-  const data = { projects, tasks, deletedTaskIds, deletedProjectIds, allTasksHiddenProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, colorScheme, compactMode, viewMode };
+  const data = { projects, tasks, deletedTaskIds, deletedProjectIds, allTasksHiddenProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme: currentTheme, colorScheme, compactMode, viewMode, uiScale };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   if(fileHandle) fileSyncWrite(data).catch(()=>{});
   maybeSnapshotBackup();
@@ -3132,10 +3168,41 @@ function openFileSyncModal(reconnectHandle){
 function closeFileSyncModal(){ document.getElementById('fileSyncModalBg')?.classList.remove('open'); }
 function toggleLibMenu(){ document.getElementById('libMenu')?.classList.toggle('open'); }
 function closeLibMenu(){ document.getElementById('libMenu')?.classList.remove('open'); }
+function renderUiScaleMenu(){
+  const el = document.getElementById('uiScaleMenu');
+  if(!el) return;
+  el.innerHTML = `
+    <div class="ui-scale-panel">
+      <div class="ui-scale-panel-header"><span>UI Size</span><span id="uiScaleValueLabel">${uiScale}%</span></div>
+      <input type="range" class="ui-scale-slider" id="uiScaleSlider" min="${UI_SCALE_MIN}" max="${UI_SCALE_MAX}" step="${UI_SCALE_STEP}" value="${uiScale}"
+        oninput="previewUiScale(this.value)" onchange="setUiScale(this.value)">
+    </div>
+  `;
+}
+function toggleUiScaleMenu(){ renderUiScaleMenu(); document.getElementById('uiScaleMenu')?.classList.toggle('open'); }
+function closeUiScaleMenu(){ document.getElementById('uiScaleMenu')?.classList.remove('open'); }
+// Live-updates the zoom + percentage label while the slider is actually
+// being dragged — cheap, immediate, and deliberately does NOT touch
+// localStorage/save()/fileSyncWrite, so a mid-drag position never spams a
+// write. Only the 'change' event (fired once, on release) commits, via
+// setUiScale() below.
+function previewUiScale(v){
+  const val = clampUiScale(v);
+  document.documentElement.style.zoom = (val/100);
+  const label = document.getElementById('uiScaleValueLabel');
+  if(label) label.textContent = val + '%';
+}
+function setUiScale(v){
+  uiScale = clampUiScale(v);
+  previewUiScale(uiScale);
+  localStorage.setItem(UI_SCALE_KEY, String(uiScale));
+  save();
+}
 
 document.addEventListener('click', e=>{
   if(!e.target.closest('#libDropdown')) closeLibMenu();
   if(!e.target.closest('#linkSplitBtn')) closeLinkMenu();
+  if(!e.target.closest('#uiScaleDropdown')) closeUiScaleMenu();
   const btn = e.target.closest('button');
   if(btn) btn.blur();
   const cb = e.target.closest('[role="checkbox"]');
@@ -3647,7 +3714,7 @@ async function createNewLinkedFile(){
     });
     fileHandle = handle;
     try{ await _fsPut(handle); }catch(_){}
-    await fileSyncWrite({projects, tasks, deletedTaskIds, deletedProjectIds, allTasksHiddenProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode});
+    await fileSyncWrite({projects, tasks, deletedTaskIds, deletedProjectIds, allTasksHiddenProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode, uiScale});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not create file', true); }
@@ -3679,7 +3746,7 @@ async function linkFile(){
       }
       return;
     }
-    await fileSyncWrite({projects, tasks, deletedTaskIds, deletedProjectIds, allTasksHiddenProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode});
+    await fileSyncWrite({projects, tasks, deletedTaskIds, deletedProjectIds, allTasksHiddenProjectIds, filterProjectId, filterStatus, filterPriority, filterTags, myDayFilter, thisWeekFilter, overdueFilter, sortBy, theme:currentTheme, colorScheme, compactMode, viewMode, uiScale});
     updateFileSyncUI();
     showToast(`Linked — auto-saving to ${handle.name}`);
   }catch(e){ if(e.name!=='AbortError') showToast('Could not link file', true); }

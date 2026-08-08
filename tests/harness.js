@@ -156,7 +156,7 @@ async function run(argv) {
   showAllCompletedList = false; expandedCompletedProjects = new Set(); draggedItem = null; draggedSubstep = null;
   filterProjectId = null; filterStatus = STATUSES.map(s=>s.id); filterPriority = PRIORITIES.map(p=>p.id); filterTags = [];
   myDayFilter = false; thisWeekFilter = false; overdueFilter = false;
-  searchQuery = ''; sortBy = 'smart'; viewMode = 'list'; currentTheme = 'light'; colorScheme = 'standard'; compactMode = true;
+  searchQuery = ''; sortBy = 'smart'; viewMode = 'list'; currentTheme = 'light'; colorScheme = 'standard'; compactMode = true; uiScale = UI_SCALE_DEFAULT;
   modalTarget = null; pendingImportData = null; editingProjectId = null; newProjIcon = 'folder';
   normalizeData();
 }
