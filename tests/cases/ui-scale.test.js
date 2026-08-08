@@ -1,11 +1,12 @@
 // Text size segmented control (topbar text-height popover) — a 4-stop CSS
-// zoom on <html> (Small/Medium/Large/Extra Large), picked from a
-// .view-switch pill (the same segmented control the List/Board toggle
-// already uses), persisted/synced the same way theme/compactMode/
-// colorScheme already are.
+// zoom on <html> (S/M/L/XL, full names Small/Medium/Large/Extra Large in
+// each segment's own tooltip), picked from a .view-switch pill (the same
+// segmented control the List/Board toggle already uses), persisted/synced
+// the same way theme/compactMode/colorScheme already are.
 
-test('UI_SCALE_STEPS has exactly the 4 original named sizes, in order', function () {
+test('UI_SCALE_STEPS has exactly the 4 original named sizes and their short forms, in order', function () {
   assertDeepEqual(UI_SCALE_STEPS.map(s => s.label), ['Small', 'Medium', 'Large', 'Extra Large']);
+  assertDeepEqual(UI_SCALE_STEPS.map(s => s.short), ['S', 'M', 'L', 'XL']);
   assertDeepEqual(UI_SCALE_STEPS.map(s => s.pct), [90, 100, 115, 130]);
 });
 
@@ -71,31 +72,33 @@ test('save() round-trips uiScale into the stored data blob', function () {
   assertEqual(saved.uiScale, 90);
 });
 
-// Pulls {label, active} out of each rendered segment button, in order —
-// avoids brittle substring matching against exact attribute ordering.
+// Pulls {short, title, active} out of each rendered segment button, in
+// order — avoids brittle substring matching against exact attribute
+// ordering.
 function renderedUiScaleSegments(){
   const html = document.getElementById('uiScaleMenu').innerHTML;
-  const re = /class="view-switch-btn( active)?"[^>]*>([^<]+)</g;
+  const re = /class="view-switch-btn( active)?" title="([^"]+)"[^>]*>([^<]+)</g;
   const out = [];
   let m;
-  while((m = re.exec(html))) out.push({ label: m[2], active: !!m[1] });
+  while((m = re.exec(html))) out.push({ active: !!m[1], title: m[2], short: m[3] });
   return out;
 }
 
-test('renderUiScaleMenu builds a 4-segment view-switch pill with the current stop marked active', function () {
+test('renderUiScaleMenu builds a 4-segment view-switch pill (S/M/L/XL) with the current stop marked active', function () {
   setUiScale(115);
   renderUiScaleMenu();
   const segments = renderedUiScaleSegments();
-  assertDeepEqual(segments.map(s => s.label), ['Small', 'Medium', 'Large', 'Extra Large']);
+  assertDeepEqual(segments.map(s => s.short), ['S', 'M', 'L', 'XL']);
+  assertDeepEqual(segments.map(s => s.title), ['Small', 'Medium', 'Large', 'Extra Large'], 'the full name is each segment\'s own tooltip');
   assertEqual(segments.filter(s => s.active).length, 1, 'exactly one segment is marked active');
-  assertEqual(segments.find(s => s.active).label, 'Large', 'Large (115%) is the active segment');
+  assertEqual(segments.find(s => s.active).short, 'L', 'Large (115%) is the active segment');
 });
 
 test('renderUiScaleMenu moves the active segment when the scale changes', function () {
   setUiScale(90);
   renderUiScaleMenu();
-  assertEqual(renderedUiScaleSegments().find(s => s.active).label, 'Small');
+  assertEqual(renderedUiScaleSegments().find(s => s.active).short, 'S');
   setUiScale(130);
   renderUiScaleMenu();
-  assertEqual(renderedUiScaleSegments().find(s => s.active).label, 'Extra Large');
+  assertEqual(renderedUiScaleSegments().find(s => s.active).short, 'XL');
 });

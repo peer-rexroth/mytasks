@@ -217,6 +217,7 @@
      is simply a no-op, never a crash. */
   .ui-scale-panel { padding: 10px 12px; }
   .ui-scale-panel-header { font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 8px; }
+  .ui-scale-panel .view-switch-btn { min-width: 30px; text-align: center; }
 
   html, body { height: 100%; }
   body { font-family: var(--font); background: var(--bg-2); color: var(--text); font-size: 15px; line-height: 1.5; display: flex; flex-direction: column; min-height: 100vh; }
@@ -971,11 +972,14 @@ const UI_SCALE_KEY = 'mytasks_uiscale';
 // Only 4 stops — the same Small/Medium/Large/Extra Large sizes the
 // original button-based picker offered, just reachable by dragging a
 // slider between them instead of clicking one of 4 separate buttons.
+// short is what's actually shown on each segment button (S/M/L/XL, so all
+// 4 fit comfortably in a compact topbar popover); label is the full name,
+// used as that segment's title tooltip.
 const UI_SCALE_STEPS = [
-  { pct: 90,  label: 'Small' },
-  { pct: 100, label: 'Medium' },
-  { pct: 115, label: 'Large' },
-  { pct: 130, label: 'Extra Large' }
+  { pct: 90,  label: 'Small',       short: 'S' },
+  { pct: 100, label: 'Medium',      short: 'M' },
+  { pct: 115, label: 'Large',       short: 'L' },
+  { pct: 130, label: 'Extra Large', short: 'XL' }
 ];
 const UI_SCALE_DEFAULT = 100;
 // Index into UI_SCALE_STEPS of whichever stop is closest to pct — this is
@@ -3196,7 +3200,7 @@ function renderUiScaleMenu(){
     <div class="ui-scale-panel">
       <div class="ui-scale-panel-header">Text Size</div>
       <div class="view-switch">${UI_SCALE_STEPS.map(s=>`
-        <button type="button" class="view-switch-btn${s.pct===uiScale?' active':''}" onclick="setUiScale(${s.pct})">${esc(s.label)}</button>
+        <button type="button" class="view-switch-btn${s.pct===uiScale?' active':''}" title="${esc(s.label)}" onclick="setUiScale(${s.pct})">${esc(s.short)}</button>
       `).join('')}</div>
     </div>
   `;
