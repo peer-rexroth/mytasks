@@ -202,19 +202,24 @@
   html[data-theme="dark"] input[type="date"] { color-scheme: dark; }
 
   /* ── UI scale ──────────────────────────────────────────────────────────────
-     A plain CSS zoom on <html>, dragged via a slider in the topbar's
-     magnifying-glass popover — continuous (80%–150%, 5% steps), so it's
-     set directly as an inline style (document.documentElement.style.zoom)
-     rather than through a small, fixed set of CSS attribute rules the way
-     data-theme/data-scheme/data-density are. zoom is a Chromium/Safari-only
-     CSS property (not Firefox) — the same "Chrome/Edge is the primary
-     target" stance the file-sync feature already takes elsewhere in this
-     app; on an unsupported browser this is simply a no-op, never a crash. */
-  .ui-scale-panel { padding: 12px 14px; min-width: 190px; }
+     A plain CSS zoom on <html>, dragged via a 4-stop slider (Small/Medium/
+     Large/Extra Large — the same 4 sizes the original button-based picker
+     offered) in the topbar's text-size popover. Set directly as an inline
+     style (document.documentElement.style.zoom) rather than through CSS
+     attribute rules the way data-theme/data-scheme/data-density are, since
+     the slider's own thumb position (not a data-* attribute) is the thing
+     driving it. zoom is a Chromium/Safari-only CSS property (not Firefox)
+     — the same "Chrome/Edge is the primary target" stance the file-sync
+     feature already takes elsewhere in this app; on an unsupported browser
+     this is simply a no-op, never a crash. */
+  .ui-scale-panel { padding: 12px 14px; min-width: 210px; }
   .ui-scale-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
   .ui-scale-panel-header span:first-child { font-weight: 600; color: var(--text-2); }
-  .ui-scale-panel-header span:last-child { color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .ui-scale-panel-header span:last-child { color: var(--text-3); }
   .ui-scale-slider { width: 100%; accent-color: var(--blue-text); }
+  .ui-scale-ticks { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: var(--text-3); }
+  .ui-scale-ticks span:first-child { text-align: left; }
+  .ui-scale-ticks span:last-child { text-align: right; }
 
   html, body { height: 100%; }
   body { font-family: var(--font); background: var(--bg-2); color: var(--text); font-size: 15px; line-height: 1.5; display: flex; flex-direction: column; min-height: 100vh; }
@@ -640,7 +645,7 @@
     </div>
     <button class="btn btn-icon btn-sm" onclick="toggleCompactMode()" title="Toggle compact view"><i class="fa-solid fa-expand" id="compactIcon"></i></button>
     <div class="lib-dropdown" id="uiScaleDropdown">
-      <button class="btn btn-icon btn-sm" onclick="event.stopPropagation();toggleUiScaleMenu()" title="UI size"><i class="fa-solid fa-magnifying-glass"></i></button>
+      <button class="btn btn-icon btn-sm" onclick="event.stopPropagation();toggleUiScaleMenu()" title="Text size"><i class="fa-solid fa-text-height"></i></button>
       <div class="split-btn-menu" id="uiScaleMenu" style="left:auto;right:0;min-width:150px"></div>
     </div>
     <button class="btn btn-icon btn-sm" onclick="openShortcutsModal()" title="Keyboard shortcuts"><i class="fa-solid fa-keyboard"></i></button>
@@ -966,18 +971,40 @@ const SCHEME_KEY = 'mytasks_scheme';
 const COMPACT_KEY = 'mytasks_compact';
 const VIEW_KEY = 'mytasks_view';
 const UI_SCALE_KEY = 'mytasks_uiscale';
-const UI_SCALE_MIN = 80;
-const UI_SCALE_MAX = 150;
-const UI_SCALE_STEP = 5;
+// Only 4 stops — the same Small/Medium/Large/Extra Large sizes the
+// original button-based picker offered, just reachable by dragging a
+// slider between them instead of clicking one of 4 separate buttons.
+const UI_SCALE_STEPS = [
+  { pct: 90,  label: 'Small' },
+  { pct: 100, label: 'Medium' },
+  { pct: 115, label: 'Large' },
+  { pct: 130, label: 'Extra Large' }
+];
 const UI_SCALE_DEFAULT = 100;
-// Rounds to the nearest step and clamps to [MIN,MAX] — used for any value
-// that could come from outside this session (localStorage, an incoming
-// synced file, a hand-edited import), not just the slider itself, which
-// already only ever produces on-step values on its own.
+// Index into UI_SCALE_STEPS of whichever stop is closest to pct — this is
+// what the slider's own position (0..UI_SCALE_STEPS.length-1) is derived
+// from, so a stored value that isn't exactly one of the 4 stops (e.g. a
+// leftover from an earlier, continuous version of this slider) still
+// lands on a sensible position rather than breaking the control.
+function uiScaleStepIndex(pct){
+  pct = Number(pct);
+  let bestIdx = 0, bestDiff = Infinity;
+  UI_SCALE_STEPS.forEach((s, i) => {
+    const diff = Math.abs(s.pct - pct);
+    if(diff < bestDiff){ bestDiff = diff; bestIdx = i; }
+  });
+  return bestIdx;
+}
+// Snaps any value — from localStorage, an incoming synced file, a
+// hand-edited import, not just the slider itself — to the nearest of the
+// 4 real stops, so uiScale is always exactly one of UI_SCALE_STEPS' own
+// pct values, never something in between.
 function clampUiScale(v){
-  v = Math.round(Number(v) / UI_SCALE_STEP) * UI_SCALE_STEP;
-  if(!isFinite(v)) return UI_SCALE_DEFAULT;
-  return Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, v));
+  if(!isFinite(Number(v))) return UI_SCALE_DEFAULT;
+  return UI_SCALE_STEPS[uiScaleStepIndex(v)].pct;
+}
+function uiScaleLabelFor(pct){
+  return UI_SCALE_STEPS[uiScaleStepIndex(pct)].label;
 }
 const THEME_SCHEMES = [
   { id: 'standard', name: 'Standard', desc: 'Neutral gray and white, with one blue accent.', swatches: ['#f5f5f3', '#0c447c', '#a32d2d'] },
@@ -3171,18 +3198,20 @@ function closeLibMenu(){ document.getElementById('libMenu')?.classList.remove('o
 function renderUiScaleMenu(){
   const el = document.getElementById('uiScaleMenu');
   if(!el) return;
+  const idx = uiScaleStepIndex(uiScale);
   el.innerHTML = `
     <div class="ui-scale-panel">
-      <div class="ui-scale-panel-header"><span>UI Size</span><span id="uiScaleValueLabel">${uiScale}%</span></div>
-      <input type="range" class="ui-scale-slider" id="uiScaleSlider" min="${UI_SCALE_MIN}" max="${UI_SCALE_MAX}" step="${UI_SCALE_STEP}" value="${uiScale}"
-        oninput="previewUiScale(this.value)" onchange="setUiScale(this.value)">
+      <div class="ui-scale-panel-header"><span>Text Size</span><span id="uiScaleValueLabel">${esc(uiScaleLabelFor(uiScale))}</span></div>
+      <input type="range" class="ui-scale-slider" id="uiScaleSlider" min="0" max="${UI_SCALE_STEPS.length-1}" step="1" value="${idx}"
+        oninput="previewUiScale(UI_SCALE_STEPS[this.value].pct)" onchange="setUiScale(UI_SCALE_STEPS[this.value].pct)">
+      <div class="ui-scale-ticks">${UI_SCALE_STEPS.map(s=>`<span>${esc(s.label)}</span>`).join('')}</div>
     </div>
   `;
 }
 function toggleUiScaleMenu(){ renderUiScaleMenu(); document.getElementById('uiScaleMenu')?.classList.toggle('open'); }
 function closeUiScaleMenu(){ document.getElementById('uiScaleMenu')?.classList.remove('open'); }
-// Live-updates the zoom + percentage label while the slider is actually
-// being dragged — cheap, immediate, and deliberately does NOT touch
+// Live-updates the zoom + label while the slider is actually being
+// dragged — cheap, immediate, and deliberately does NOT touch
 // localStorage/save()/fileSyncWrite, so a mid-drag position never spams a
 // write. Only the 'change' event (fired once, on release) commits, via
 // setUiScale() below.
@@ -3190,7 +3219,7 @@ function previewUiScale(v){
   const val = clampUiScale(v);
   document.documentElement.style.zoom = (val/100);
   const label = document.getElementById('uiScaleValueLabel');
-  if(label) label.textContent = val + '%';
+  if(label) label.textContent = uiScaleLabelFor(val);
 }
 function setUiScale(v){
   uiScale = clampUiScale(v);

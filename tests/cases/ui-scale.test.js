@@ -1,25 +1,42 @@
-// UI size slider (topbar magnifying-glass popover) — a continuous CSS zoom
-// on <html> (80%-150%, 5% steps), persisted/synced the same way theme/
+// Text size slider (topbar text-height popover) — a 4-stop CSS zoom on
+// <html> (Small/Medium/Large/Extra Large — the same 4 sizes the original
+// button-based picker offered), persisted/synced the same way theme/
 // compactMode/colorScheme already are.
 
-test('clampUiScale rounds to the nearest step and clamps to [MIN,MAX]', function () {
-  assertEqual(clampUiScale(103), 105, 'rounds to the nearest 5% step');
-  assertEqual(clampUiScale(50), UI_SCALE_MIN, 'clamps below the minimum');
-  assertEqual(clampUiScale(999), UI_SCALE_MAX, 'clamps above the maximum');
+test('UI_SCALE_STEPS has exactly the 4 original named sizes, in order', function () {
+  assertDeepEqual(UI_SCALE_STEPS.map(s => s.label), ['Small', 'Medium', 'Large', 'Extra Large']);
+  assertDeepEqual(UI_SCALE_STEPS.map(s => s.pct), [90, 100, 115, 130]);
+});
+
+test('uiScaleStepIndex finds the exact stop, and snaps an in-between value to the nearest one', function () {
+  assertEqual(uiScaleStepIndex(100), 1);
+  assertEqual(uiScaleStepIndex(130), 3);
+  assertEqual(uiScaleStepIndex(103), 1, 'closer to Medium (100) than Large (115)');
+  assertEqual(uiScaleStepIndex(999), 3, 'clamps to the last stop for anything past it');
+});
+
+test('clampUiScale snaps any value to one of the 4 real stops', function () {
+  assertEqual(clampUiScale(103), 100);
+  assertEqual(clampUiScale(999), 130);
   assertEqual(clampUiScale('not-a-number'), UI_SCALE_DEFAULT, 'falls back to the default on garbage input');
 });
 
-test('setUiScale updates state, applies the zoom style, and localStorage', function () {
-  setUiScale(120);
-  assertEqual(uiScale, 120);
-  assertEqual(document.documentElement.style.zoom, 1.2);
-  assertEqual(localStorage.getItem('mytasks_uiscale'), '120');
+test('uiScaleLabelFor names the stop a pct value snaps to', function () {
+  assertEqual(uiScaleLabelFor(90), 'Small');
+  assertEqual(uiScaleLabelFor(130), 'Extra Large');
 });
 
-test('setUiScale clamps an out-of-range or off-step value before storing it', function () {
+test('setUiScale updates state, applies the zoom style, and localStorage', function () {
+  setUiScale(115);
+  assertEqual(uiScale, 115);
+  assertEqual(document.documentElement.style.zoom, 1.15);
+  assertEqual(localStorage.getItem('mytasks_uiscale'), '115');
+});
+
+test('setUiScale snaps an off-stop value to the nearest real one before storing it', function () {
   setUiScale(999);
-  assertEqual(uiScale, UI_SCALE_MAX);
-  setUiScale(101);
+  assertEqual(uiScale, 130);
+  setUiScale(103);
   assertEqual(uiScale, 100);
 });
 
@@ -33,37 +50,39 @@ test('load() picks up a uiScale saved in the data blob, same as colorScheme', fu
 });
 
 test('load() ignores a non-numeric uiScale rather than crashing', function () {
-  uiScale = 120;
+  uiScale = 115;
   localStorage.setItem('mytasks_data_v1', JSON.stringify({
     projects: defaultProjects(), tasks: defaultTasks(), uiScale: 'huge'
   }));
   load();
-  assertEqual(uiScale, 120, 'an invalid saved scale should leave the current one alone');
+  assertEqual(uiScale, 115, 'an invalid saved scale should leave the current one alone');
 });
 
 test('save() round-trips uiScale into the stored data blob', function () {
-  setUiScale(85);
+  setUiScale(90);
   const saved = JSON.parse(localStorage.getItem('mytasks_data_v1'));
-  assertEqual(saved.uiScale, 85);
+  assertEqual(saved.uiScale, 90);
 });
 
 test('previewUiScale applies the zoom and updates the label without persisting', function () {
   setUiScale(100);
   renderUiScaleMenu();
-  previewUiScale(140);
-  assertEqual(document.documentElement.style.zoom, 1.4, 'zoom applies immediately for live feedback');
+  previewUiScale(130);
+  assertEqual(document.documentElement.style.zoom, 1.3, 'zoom applies immediately for live feedback');
   assertEqual(uiScale, 100, 'state is not committed until setUiScale (the slider\'s change event) runs');
   assertEqual(localStorage.getItem('mytasks_uiscale'), '100', 'localStorage is not touched by a mid-drag preview');
-  assertEqual(document.getElementById('uiScaleValueLabel').textContent, '140%');
+  assertEqual(document.getElementById('uiScaleValueLabel').textContent, 'Extra Large');
 });
 
-test('renderUiScaleMenu builds a slider matching the current value and bounds', function () {
+test('renderUiScaleMenu builds a 4-stop slider (0-3) positioned at the current step, plus tick labels', function () {
   setUiScale(115);
   renderUiScaleMenu();
   const html = document.getElementById('uiScaleMenu').innerHTML;
-  assertIncludes(html, `min="${UI_SCALE_MIN}"`);
-  assertIncludes(html, `max="${UI_SCALE_MAX}"`);
-  assertIncludes(html, `step="${UI_SCALE_STEP}"`);
-  assertIncludes(html, 'value="115"');
-  assertIncludes(html, '115%');
+  assertIncludes(html, 'min="0"');
+  assertIncludes(html, `max="${UI_SCALE_STEPS.length - 1}"`);
+  assertIncludes(html, 'step="1"');
+  assertIncludes(html, 'value="2"', 'Large is index 2');
+  assertIncludes(html, 'Large');
+  assertIncludes(html, 'Small');
+  assertIncludes(html, 'Extra Large');
 });
