@@ -74,7 +74,7 @@ test('previewUiScale applies the zoom and updates the label without persisting',
   assertEqual(document.getElementById('uiScaleValueLabel').textContent, 'Extra Large');
 });
 
-test('renderUiScaleMenu builds a 4-stop slider (0-3) positioned at the current step, plus tick labels', function () {
+test('renderUiScaleMenu builds a 4-stop slider (0-3) positioned at the current step, with native tick marks', function () {
   setUiScale(115);
   renderUiScaleMenu();
   const html = document.getElementById('uiScaleMenu').innerHTML;
@@ -82,7 +82,10 @@ test('renderUiScaleMenu builds a 4-stop slider (0-3) positioned at the current s
   assertIncludes(html, `max="${UI_SCALE_STEPS.length - 1}"`);
   assertIncludes(html, 'step="1"');
   assertIncludes(html, 'value="2"', 'Large is index 2');
-  assertIncludes(html, 'Large');
-  assertIncludes(html, 'Small');
-  assertIncludes(html, 'Extra Large');
+  assertIncludes(html, 'list="uiScaleTicks"', 'wired to a datalist for native tick marks on the track');
+  assertIncludes(html, 'Large', 'the header shows the current stop\'s name');
+  // one <option> per stop in the datalist, and nowhere else — no separate
+  // text-label row underneath the track any more
+  assertEqual((html.match(/<option/g) || []).length, UI_SCALE_STEPS.length);
+  assertNotIncludes(html, 'Extra Large', 'only the current stop\'s name shows, not every stop\'s label');
 });

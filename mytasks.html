@@ -212,14 +212,15 @@
      — the same "Chrome/Edge is the primary target" stance the file-sync
      feature already takes elsewhere in this app; on an unsupported browser
      this is simply a no-op, never a crash. */
-  .ui-scale-panel { padding: 12px 14px; min-width: 210px; }
+  .ui-scale-panel { padding: 12px 14px; min-width: 190px; }
   .ui-scale-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
   .ui-scale-panel-header span:first-child { font-weight: 600; color: var(--text-2); }
   .ui-scale-panel-header span:last-child { color: var(--text-3); }
+  /* Native tick marks (via the <datalist> wired to this input's own "list"
+     attribute) mark the 4 stops directly on the track — no separate label
+     row underneath needed; the current stop's name already shows in the
+     header above. */
   .ui-scale-slider { width: 100%; accent-color: var(--blue-text); }
-  .ui-scale-ticks { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: var(--text-3); }
-  .ui-scale-ticks span:first-child { text-align: left; }
-  .ui-scale-ticks span:last-child { text-align: right; }
 
   html, body { height: 100%; }
   body { font-family: var(--font); background: var(--bg-2); color: var(--text); font-size: 15px; line-height: 1.5; display: flex; flex-direction: column; min-height: 100vh; }
@@ -3202,9 +3203,9 @@ function renderUiScaleMenu(){
   el.innerHTML = `
     <div class="ui-scale-panel">
       <div class="ui-scale-panel-header"><span>Text Size</span><span id="uiScaleValueLabel">${esc(uiScaleLabelFor(uiScale))}</span></div>
-      <input type="range" class="ui-scale-slider" id="uiScaleSlider" min="0" max="${UI_SCALE_STEPS.length-1}" step="1" value="${idx}"
+      <input type="range" class="ui-scale-slider" id="uiScaleSlider" min="0" max="${UI_SCALE_STEPS.length-1}" step="1" value="${idx}" list="uiScaleTicks"
         oninput="previewUiScale(UI_SCALE_STEPS[this.value].pct)" onchange="setUiScale(UI_SCALE_STEPS[this.value].pct)">
-      <div class="ui-scale-ticks">${UI_SCALE_STEPS.map(s=>`<span>${esc(s.label)}</span>`).join('')}</div>
+      <datalist id="uiScaleTicks">${UI_SCALE_STEPS.map((s,i)=>`<option value="${i}"></option>`).join('')}</datalist>
     </div>
   `;
 }
